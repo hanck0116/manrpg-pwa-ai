@@ -43,7 +43,14 @@ export type QueuedAction = {
   steps?: number;
 };
 
-export type BattlePhase = 'player-main' | 'player-reaction' | 'enemy-main' | 'enemy-reaction' | 'battle-ended';
+export type BattlePhase =
+  | 'player-main'
+  | 'player-reaction'
+  | 'enemy-main'
+  | 'enemy-reaction'
+  | 'floor-cleared'
+  | 'reward-pending'
+  | 'battle-ended';
 export type TurnOwner = 'player' | 'enemy';
 export type BattleResult = 'win' | 'lose';
 
@@ -52,9 +59,27 @@ export type GameLogEntry = {
   message: string;
 };
 
+export type RewardItem = {
+  id: string;
+  name: string;
+  type: 'coin' | 'martial' | 'magicBook' | 'multi' | 'reset' | 'trait' | 'special' | 'item';
+  coin?: number;
+  grade?: string;
+  sell?: number;
+};
+
+export type RewardState = {
+  offered: RewardItem[];
+  selectedIds: string[];
+  offerCount: number;
+  pickCount: number;
+  claimed: boolean;
+};
+
 export type GameState = {
   setupMode: boolean;
   turn: number;
+  floor: number;
   player: Character;
   enemy: Character;
   log: GameLogEntry[];
@@ -63,6 +88,8 @@ export type GameState = {
   initiative: TurnOwner;
   actionQueue: QueuedAction[];
   turnOwner: TurnOwner;
+  rewardState?: RewardState;
+  inventory: RewardItem[];
   battleResult?: BattleResult;
 };
 
@@ -133,6 +160,7 @@ export const createInitialGameState = (): GameState => {
 
   return {
     setupMode: true,
+    floor: 1,
     turn: 1,
     player,
     enemy,
@@ -146,7 +174,9 @@ export const createInitialGameState = (): GameState => {
     phase: initiative === 'player' ? 'player-main' : 'enemy-main',
     initiative,
     actionQueue: [],
-    turnOwner: initiative
+    turnOwner: initiative,
+    rewardState: undefined,
+    inventory: []
   };
 };
 

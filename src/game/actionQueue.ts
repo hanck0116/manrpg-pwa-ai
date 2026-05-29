@@ -2,11 +2,11 @@ import { moveCharacterSteps } from './movement';
 import { resolveBasicAttack } from '../rules/combat';
 import { appendLog, type GameState, type QueuedAction } from '../state/gameState';
 
-const hasBattleEnded = (state: GameState): boolean =>
-  state.phase === 'battle-ended' || state.player.hp <= 0 || state.enemy.hp <= 0;
+const isActionBlockedPhase = (state: GameState): boolean =>
+  state.phase === 'battle-ended' || state.phase === 'floor-cleared' || state.phase === 'reward-pending' || state.player.hp <= 0 || state.enemy.hp <= 0;
 
 const withBattleEndedIfNeeded = (state: GameState): GameState => {
-  if (state.phase === 'battle-ended') {
+  if (state.phase === 'battle-ended' || state.phase === 'floor-cleared' || state.phase === 'reward-pending') {
     return state;
   }
 
@@ -14,12 +14,12 @@ const withBattleEndedIfNeeded = (state: GameState): GameState => {
     return appendLog(
       {
         ...state,
-        phase: 'battle-ended',
+        phase: 'floor-cleared',
         battleResult: 'win',
         turnOwner: 'player',
         actionQueue: []
       },
-      '전투 종료: 적 HP가 0이 되어 남은 행동 큐를 실행하지 않습니다.'
+      '층 클리어: 적이 쓰러졌습니다. 정비 단계로 이동할 수 있습니다.'
     );
   }
 
@@ -44,8 +44,8 @@ export const enqueueAction = (state: GameState, action: QueuedAction): GameState
     return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
   }
 
-  if (state.phase === 'battle-ended') {
-    return appendLog(state, '전투가 종료되어 행동을 추가할 수 없습니다.');
+  if (state.phase === 'battle-ended' || state.phase === 'floor-cleared' || state.phase === 'reward-pending') {
+    return appendLog(state, '현재 단계에서는 행동을 추가할 수 없습니다. 다음 층 진입 후 전투 행동이 가능합니다.');
   }
 
   if (state.phase !== 'player-main') {
@@ -81,7 +81,7 @@ export const clearActionQueue = (state: GameState): GameState => ({
 });
 
 const executeQueuedAction = (state: GameState, action: QueuedAction): GameState => {
-  if (hasBattleEnded(state)) {
+  if (isActionBlockedPhase(state)) {
     return withBattleEndedIfNeeded(state);
   }
 
@@ -135,7 +135,7 @@ export const executeActionQueue = (state: GameState): GameState => {
   for (const action of state.actionQueue) {
     currentState = withBattleEndedIfNeeded(currentState);
 
-    if (currentState.phase === 'battle-ended') {
+    if (currentState.phase === 'battle-ended' || currentState.phase === 'floor-cleared' || currentState.phase === 'reward-pending') {
       return currentState;
     }
 

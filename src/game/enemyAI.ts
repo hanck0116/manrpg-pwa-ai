@@ -18,7 +18,7 @@ export const runEnemyMainTurn = (state: GameState): GameState => {
     return state;
   }
 
-  if (state.phase === 'battle-ended' || state.enemy.hp <= 0 || state.player.hp <= 0) {
+  if (state.phase === 'battle-ended' || state.phase === 'floor-cleared' || state.phase === 'reward-pending' || state.enemy.hp <= 0 || state.player.hp <= 0) {
     return state;
   }
 
