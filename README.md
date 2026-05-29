@@ -2,7 +2,7 @@
 
 ManRPG를 **실행 가능한 PWA 기본 골격 + 로컬 규칙 엔진 + 고정 7x7 맵 + 1인 전투 루프**로 구성하는 진행 중 구현입니다.
 
-현재 단계의 목표는 “원본 통합본 기준으로 로컬 규칙 엔진의 파생 수치, 다이스 판정, 전투 계산 구조를 정리한다”입니다.
+현재 단계의 목표는 “1인 플레이어 캐릭터 생성/스탯 분배 UI를 구현하고, 생성 완료 후 기존 1:1 전투 루프로 진입한다”입니다.
 
 - Vite + TypeScript 기반
 - API 키 없이도 화면 표시
@@ -14,6 +14,8 @@ ManRPG를 **실행 가능한 PWA 기본 골격 + 로컬 규칙 엔진 + 고정 7
 - 보스몹 없음
 - 맵은 항상 동일한 7x7 고정 맵
 - 3인/파티/플레이어 선택 구조 없음
+- 최초 실행 시 `setupMode=true`로 캐릭터 생성/스탯 분배 패널을 표시
+- 생성 완료 전에는 이동/공격/스킬/마법/아이템/방어/대기/턴 마무리를 비활성화
 - 버튼을 누르면 즉시 실행하지 않고 행동 큐에 쌓은 뒤, 턴 마무리에서 순서대로 실행
 - 턴 마무리 한 번으로 플레이어 행동 큐 실행, 플레이어 MP 회복, 적 행동 자동 진행, 플레이어 메인턴 복귀까지 처리
 
@@ -52,6 +54,12 @@ npm run worker:check
 
 - 7x7 고정 맵 표시
 - 플레이어 1명과 적 1명 표시
+- 캐릭터 생성/스탯 분배 UI
+  - 시작 레벨 1, 기본 6개 스탯 각각 1
+  - 추가 분배 포인트 54를 사용해 총 스탯 60으로 생성
+  - 힘/민첩/체력/지능/지혜/외모만 +/- 버튼으로 조정
+  - 남은 포인트가 0일 때만 생성 완료 가능
+  - 생성 완료 시 `setupMode=false`로 전환하고 전투 행동 가능
 - 플레이어/적 상태창 표시
   - 기본 화면: HP, MP, 레벨, 최종 공격력, 코인, 좌표
   - 접이식 상세 스탯: 힘/민첩/체력/지능/지혜/외모, 남은 스탯 포인트, 외공, 내공, 검기 이름, 기본 공격력, 멀티캐스팅, MP 회복
@@ -63,6 +71,7 @@ npm run worker:check
   - 이동/기본 공격/스킬/마법/아이템/방어/대기 행동 추가
   - 행동별 삭제 버튼
   - 플레이어 메인턴에서만 행동 추가 가능
+  - `setupMode=true`인 캐릭터 생성 중에는 행동 추가/턴 마무리/적 자동 턴 진행 불가
   - 전투 종료/플레이어 사망/적 사망 공격 추가 방지
   - 턴 마무리 시 큐를 순서대로 실행
   - 전투 종료가 발생하면 남은 큐는 실행하지 않음
@@ -88,8 +97,11 @@ npm run worker:check
   - 적 HP 0: `battleResult='win'`
   - 플레이어 HP 0: `battleResult='lose'`
 - 새 전투 시작
-  - `battle-ended` 상태에서 같은 7x7 고정 맵으로 플레이어 1명과 적 1명을 초기화
-  - 보스몹/랜덤 맵/다중 적 생성 없음
+  - `battle-ended` 상태에서만 가능
+  - 스탯 분배 화면으로 돌아가지 않고 `setupMode=false`를 유지
+  - 플레이어의 현재 스탯 배분은 유지하고 HP/MP를 최대치로 회복
+  - 적 1명만 초기 적으로 재생성
+  - 같은 7x7 고정 맵을 사용하며 보스몹/랜덤 맵/다중 적 생성 없음
 - 반응턴 구조 자리
   - `player-reaction`, `enemy-reaction` phase 타입은 존재
   - 실제 반응 행동은 다음 단계 TODO
@@ -101,9 +113,9 @@ npm run worker:check
   - 계단 미구현 표시
 - 전투 로그 최근 20개 표시
 - 저장/불러오기 stub
-  - `saveVersion: 2`
-  - `appearance`, `outerStack`, `innerStack`, `swordKi`, `multicasting`, `traits`, `coin`이 포함된 현재 구조만 유효 저장으로 취급
-  - saveVersion 1 데이터 또는 깨진 저장 데이터는 초기 상태로 복구
+  - `saveVersion: 3`
+  - `setupMode` boolean과 `appearance`, `outerStack`, `innerStack`, `swordKi`, `multicasting`, `traits`, `coin`이 포함된 현재 구조만 유효 저장으로 취급
+  - saveVersion 2 이하 데이터 또는 깨진 저장 데이터는 초기 상태로 복구
   - actionQueue 저장/복구
 - 접이식 AI 설정 패널 자리
 - Cloudflare Worker stub
@@ -114,6 +126,7 @@ npm run worker:check
 원본 통합본의 최종 파생 수치 규칙을 현재 상태 구조에 맞춰 TypeScript로 이식했습니다.
 
 - 시작 CoreStats
+  - `setupMode = true`
   - `level = 1`
   - `strength = 1`
   - `dexterity = 1`
@@ -127,6 +140,14 @@ npm run worker:check
   - `multicasting = 1`
   - `traits = []`
   - `coin = 0`
+- 캐릭터 생성 규칙
+  - 시작 레벨: 1
+  - 기본 스탯: 힘/민첩/체력/지능/지혜/외모 각각 1
+  - 추가 분배 포인트: 54
+  - 총 시작 스탯 합계: 60
+  - 총 스탯 포인트 총량: `60 + (level - 1) * 3`
+  - 남은 포인트: 총 스탯 포인트 총량 - 현재 6개 스탯 합계
+  - 레벨 80 미만 최대 스탯: `level + 20`; 레벨 80 이상 최대 스탯: 100
 - 파생 수치
   - `totalStatPoint = 60 + (level - 1) * 3`
   - `usedStatPoint = strength + dexterity + constitution + intelligence + wisdom + appearance`
@@ -160,7 +181,7 @@ npm run worker:check
 
 ## 아직 미구현/TODO
 
-- 총 시작 스탯 60, 추가 분배 포인트 54를 사용하는 캐릭터 생성/분배 UI
+- 레벨업 UI
 - 일반 판정의 상황별 성공조건 정리
 - 심법, 심적초월, 불멸, 자기상환적 돌연변이 등 상태 필드가 더 필요한 파생 수치
 - 반응턴 실제 구현

@@ -251,3 +251,61 @@ button:disabled {
   opacity: 0.5;
   transform: none;
 }
+
+.stat-allocation summary {
+  cursor: pointer;
+  font-weight: 900;
+  font-size: 1.1rem;
+}
+
+.setup-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.setup-summary span {
+  padding: 0.75rem;
+  border-radius: 0.85rem;
+  background: #10131c;
+  color: #c6cbe0;
+}
+
+.setup-summary strong {
+  display: block;
+  color: #f7c873;
+  font-size: 1.35rem;
+}
+
+.stat-controls {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: minmax(4rem, 1fr) 3rem 3rem 3rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.stat-row span,
+.stat-row strong {
+  font-weight: 900;
+}
+
+.stat-row strong {
+  text-align: center;
+  color: #72d6a3;
+}
+
+.setup-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.8rem;
+}

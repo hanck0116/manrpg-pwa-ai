@@ -53,6 +53,7 @@ export type GameLogEntry = {
 };
 
 export type GameState = {
+  setupMode: boolean;
   turn: number;
   player: Character;
   enemy: Character;
@@ -82,6 +83,29 @@ export const createCharacter = (
 const getInitialInitiative = (player: Character, enemy: Character): TurnOwner =>
   enemy.stats.dexterity > player.stats.dexterity ? 'enemy' : 'player';
 
+export const createInitialEnemy = (): Character =>
+  createCharacter({
+    id: 'enemy-1',
+    name: '훈련용 고블린',
+    kind: 'enemy',
+    position: { x: 3, y: 1 },
+    stats: {
+      level: 1,
+      strength: 1,
+      dexterity: 1,
+      constitution: 1,
+      intelligence: 1,
+      wisdom: 1,
+      appearance: 1,
+      outerStack: 0,
+      innerStack: 0,
+      swordKi: 0,
+      multicasting: 1,
+      traits: [],
+      coin: 0
+    }
+  });
+
 export const createInitialGameState = (): GameState => {
   const player = createCharacter({
     id: 'player-1',
@@ -104,37 +128,18 @@ export const createInitialGameState = (): GameState => {
       coin: 0
     }
   });
-  const enemy = createCharacter({
-    id: 'enemy-1',
-    name: '훈련용 고블린',
-    kind: 'enemy',
-    position: { x: 3, y: 1 },
-    stats: {
-      level: 1,
-      strength: 1,
-      dexterity: 1,
-      constitution: 1,
-      intelligence: 1,
-      wisdom: 1,
-      appearance: 1,
-      outerStack: 0,
-      innerStack: 0,
-      swordKi: 0,
-      multicasting: 1,
-      traits: [],
-      coin: 0
-    }
-  });
+  const enemy = createInitialEnemy();
   const initiative = getInitialInitiative(player, enemy);
 
   return {
+    setupMode: true,
     turn: 1,
     player,
     enemy,
     log: [
       {
         turn: 1,
-        message: `고정 7x7 맵에 플레이어 1명과 적 1명이 배치되었습니다. 선턴: ${initiative === 'player' ? '플레이어' : '적'}`
+        message: `고정 7x7 맵에 플레이어 1명과 적 1명이 배치되었습니다. 캐릭터 생성에서 총 스탯 60이 되도록 54포인트를 분배하세요. 선턴: ${initiative === 'player' ? '플레이어' : '적'}`
       }
     ],
     selectedAction: '대기',

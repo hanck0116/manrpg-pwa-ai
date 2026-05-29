@@ -1,6 +1,6 @@
 import { executeActionQueue } from './actionQueue';
 import { runEnemyMainTurn } from './enemyAI';
-import { appendLog, createInitialGameState, type GameState } from '../state/gameState';
+import { appendLog, createInitialEnemy, type Character, type GameState } from '../state/gameState';
 
 const withBattleEndIfNeeded = (state: GameState): GameState => {
   if (state.phase === 'battle-ended') {
@@ -36,6 +36,45 @@ const withBattleEndIfNeeded = (state: GameState): GameState => {
   return state;
 };
 
+const recoverCharacter = (character: Character, position: Character['position']): Character => ({
+  ...character,
+  position,
+  hp: character.derived.maxHP,
+  mp: character.derived.maxMP,
+  guarding: false
+});
+
+export const createNewBattleFromPlayer = (state: GameState): GameState => {
+  if (state.setupMode) {
+    return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
+  }
+
+  if (state.phase !== 'battle-ended') {
+    return appendLog(state, '전투 종료 상태에서만 새 전투를 시작할 수 있습니다.');
+  }
+
+  const player = recoverCharacter(state.player, { x: 3, y: 5 });
+  const enemy = createInitialEnemy();
+  const initiative = enemy.stats.dexterity > player.stats.dexterity ? 'enemy' : 'player';
+
+  return appendLog(
+    {
+      ...state,
+      setupMode: false,
+      turn: 1,
+      player,
+      enemy,
+      selectedAction: '대기',
+      phase: initiative === 'player' ? 'player-main' : 'enemy-main',
+      initiative,
+      actionQueue: [],
+      turnOwner: initiative,
+      battleResult: undefined
+    },
+    '새 전투를 시작했습니다. 플레이어 스탯 배분은 유지하고 HP/MP와 적 1명만 초기화했습니다.'
+  );
+};
+
 const recoverPlayerMp = (state: GameState): GameState => ({
   ...state,
   player: {
@@ -45,6 +84,10 @@ const recoverPlayerMp = (state: GameState): GameState => ({
 });
 
 const runAutomaticEnemyTurn = (state: GameState): GameState => {
+  if (state.setupMode) {
+    return state;
+  }
+
   const enemyTurnState = appendLog(
     {
       ...state,
@@ -72,9 +115,11 @@ const runAutomaticEnemyTurn = (state: GameState): GameState => {
   );
 };
 
-export const startBattle = (): GameState => createInitialGameState();
-
 export const applyQueuedPlayerActions = (state: GameState): GameState => {
+  if (state.setupMode) {
+    return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
+  }
+
   if (state.phase !== 'player-main') {
     return appendLog(state, '플레이어 메인턴이 아니라 행동 큐를 실행할 수 없습니다.');
   }
@@ -87,6 +132,10 @@ export const applyQueuedPlayerActions = (state: GameState): GameState => {
 };
 
 export const finishPlayerMainTurn = (state: GameState): GameState => {
+  if (state.setupMode) {
+    return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
+  }
+
   if (state.phase !== 'player-main') {
     return appendLog(state, '현재는 플레이어 메인턴이 아닙니다.');
   }
@@ -104,6 +153,10 @@ export const finishPlayerMainTurn = (state: GameState): GameState => {
 };
 
 export const finishEnemyMainTurn = (state: GameState): GameState => {
+  if (state.setupMode) {
+    return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
+  }
+
   if (state.phase !== 'enemy-main') {
     return appendLog(state, '현재는 적 메인턴이 아닙니다.');
   }
@@ -126,6 +179,10 @@ export const finishEnemyMainTurn = (state: GameState): GameState => {
 };
 
 export const advanceTurn = (state: GameState): GameState => {
+  if (state.setupMode) {
+    return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
+  }
+
   switch (state.phase) {
     case 'player-main':
       return finishPlayerMainTurn(state);

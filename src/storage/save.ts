@@ -1,9 +1,9 @@
 import { calcDerivedStats } from '../rules/derivedStats';
 import { createInitialGameState, type Character, type CoreStats, type GameState } from '../state/gameState';
 
-const SAVE_KEY = 'manrpg-pwa-ai:save:v2';
-const LEGACY_SAVE_KEY = 'manrpg-pwa-ai:save:v1';
-const SAVE_VERSION = 2;
+const SAVE_KEY = 'manrpg-pwa-ai:save:v3';
+const LEGACY_SAVE_KEYS = ['manrpg-pwa-ai:save:v2', 'manrpg-pwa-ai:save:v1'];
+const SAVE_VERSION = 3;
 
 type SavePayload = {
   saveVersion: number;
@@ -65,6 +65,7 @@ const isValidGameState = (value: unknown): value is GameState => {
   }
 
   return (
+    typeof value.setupMode === 'boolean' &&
     isValidCharacter(value.player, 'player') &&
     isValidCharacter(value.enemy, 'enemy') &&
     Array.isArray(value.log) &&
@@ -100,7 +101,7 @@ export const saveGameStub = (state: GameState): string => {
 };
 
 export const loadGameStub = (): GameState => {
-  const raw = localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(LEGACY_SAVE_KEY);
+  const raw = localStorage.getItem(SAVE_KEY) ?? LEGACY_SAVE_KEYS.map((key) => localStorage.getItem(key)).find((value) => value !== null);
 
   if (!raw) {
     return createInitialGameState();
