@@ -1,5 +1,6 @@
 import { enqueueAction, removeQueuedAction } from '../game/actionQueue';
 import { clearFloorRecovery, enterNextFloor } from '../game/floor';
+import { sellInventoryItem, useInventoryItem } from '../game/inventory';
 import { applyFiveLevelPlus, canFinishLevelAllocation, finishLevelAllocation } from '../game/levelUp';
 import { createRewardOffer, claimSelectedRewards, toggleRewardSelection } from '../game/rewardFlow';
 import { advanceTurn, createNewBattleFromPlayer } from '../game/turn';
@@ -278,21 +279,47 @@ const renderRewardPanel = (state: GameState): string => {
 };
 
 const renderInventorySummary = (state: GameState): string => {
-  const counts = state.inventory.reduce<Record<string, number>>((acc, item) => {
-    acc[item.name] = (acc[item.name] ?? 0) + 1;
-    return acc;
-  }, {});
-  const entries = Object.entries(counts);
+  const maintenanceDisabled = ['reward-pending', 'level-up-pending', 'floor-cleared', 'battle-ended'].includes(state.phase) ? '' : 'disabled';
 
   return `
     <section class="panel inventory-panel">
       <details>
-        <summary>인벤토리 요약 (${state.inventory.length})</summary>
-        ${entries.length === 0 ? '<p class="muted">보유 아이템이 없습니다.</p>' : `<ul>${entries.map(([name, count]) => `<li>${name} × ${count}</li>`).join('')}</ul>`}
+        <summary>정비용 인벤토리 (${state.inventory.length})</summary>
+        <p class="muted">아이템 사용/판매는 정비 단계에서만 가능합니다. 전투 중 아이템 행동과는 아직 연결하지 않습니다.</p>
+        ${
+          state.inventory.length === 0
+            ? '<p class="muted">보유 아이템이 없습니다.</p>'
+            : `<ul class="inventory-list">${state.inventory
+                .map(
+                  (item) => `
+                    <li>
+                      <span>${item.name}${item.grade ? ` / ${item.grade}` : ''} · 판매가 ${item.sell ?? 0}코인</span>
+                      <span class="inline-actions">
+                        <button type="button" data-use-item="${item.id}" ${maintenanceDisabled}>사용</button>
+                        <button type="button" data-sell-item="${item.id}" ${maintenanceDisabled}>판매</button>
+                      </span>
+                    </li>
+                  `
+                )
+                .join('')}</ul>`
+        }
       </details>
     </section>
   `;
 };
+
+const renderKnownSpells = (state: GameState): string => `
+  <section class="panel spells-panel">
+    <details>
+      <summary>보유 마법 (${state.spells.length})</summary>
+      ${
+        state.spells.length === 0
+          ? '<p class="muted">습득한 마법이 없습니다.</p>'
+          : `<ul>${state.spells.map((spell) => `<li>${spell.name} / ${spell.circle}서클 / ${spell.grade}</li>`).join('')}</ul>`
+      }
+    </details>
+  </section>
+`;
 
 const renderActionQueue = (state: GameState): string => `
   <section class="panel queue-panel">
@@ -383,6 +410,7 @@ const template = (state: GameState): string => `
     ${renderFloorClearPanel(state)}
     ${renderRewardPanel(state)}
     ${renderInventorySummary(state)}
+    ${renderKnownSpells(state)}
     ${renderActionQueue(state)}
     ${renderActionButtons(state)}
     ${renderAISettings()}
@@ -419,6 +447,8 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const statIncrease = target.dataset.statIncrease as AllocatableStatKey | undefined;
     const statDecrease = target.dataset.statDecrease as AllocatableStatKey | undefined;
     const rewardId = target.dataset.toggleReward;
+    const useItemId = target.dataset.useItem;
+    const sellItemId = target.dataset.sellItem;
 
     if (statIncrease) {
       setState(increaseStat(getState(), statIncrease));
@@ -457,6 +487,16 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
 
     if (rewardId) {
       setState(toggleRewardSelection(getState(), rewardId));
+      return;
+    }
+
+    if (useItemId) {
+      setState(useInventoryItem(getState(), useItemId));
+      return;
+    }
+
+    if (sellItemId) {
+      setState(sellInventoryItem(getState(), sellItemId));
       return;
     }
 

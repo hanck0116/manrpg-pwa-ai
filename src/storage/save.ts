@@ -1,9 +1,9 @@
 import { calcDerivedStats } from '../rules/derivedStats';
-import { createInitialGameState, type Character, type CoreStats, type GameState, type RewardItem, type RewardState } from '../state/gameState';
+import { createInitialGameState, type Character, type CoreStats, type GameState, type LearnedSpell, type RewardItem, type RewardState } from '../state/gameState';
 
-const SAVE_KEY = 'manrpg-pwa-ai:save:v5';
-const LEGACY_SAVE_KEYS = ['manrpg-pwa-ai:save:v4', 'manrpg-pwa-ai:save:v3', 'manrpg-pwa-ai:save:v2', 'manrpg-pwa-ai:save:v1'];
-const SAVE_VERSION = 5;
+const SAVE_KEY = 'manrpg-pwa-ai:save:v6';
+const LEGACY_SAVE_KEYS = ['manrpg-pwa-ai:save:v5', 'manrpg-pwa-ai:save:v4', 'manrpg-pwa-ai:save:v3', 'manrpg-pwa-ai:save:v2', 'manrpg-pwa-ai:save:v1'];
+const SAVE_VERSION = 6;
 
 type SavePayload = {
   saveVersion: number;
@@ -73,7 +73,24 @@ const isValidRewardItem = (value: unknown): value is RewardItem => {
     validRewardTypes.includes(value.type as RewardItem['type']) &&
     (value.coin === undefined || isNumber(value.coin)) &&
     (value.grade === undefined || typeof value.grade === 'string') &&
-    (value.sell === undefined || isNumber(value.sell))
+    (value.sell === undefined || isNumber(value.sell)) &&
+    (value.mode === undefined || value.mode === 'random' || value.mode === 'select') &&
+    (value.learnedSpellName === undefined || typeof value.learnedSpellName === 'string') &&
+    (value.learnedCircle === undefined || isNumber(value.learnedCircle))
+  );
+};
+
+const isValidLearnedSpell = (value: unknown): value is LearnedSpell => {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.name === 'string' &&
+    isNumber(value.circle) &&
+    typeof value.grade === 'string' &&
+    (value.sourceItemName === undefined || typeof value.sourceItemName === 'string')
   );
 };
 
@@ -113,6 +130,8 @@ const isValidGameState = (value: unknown): value is GameState => {
     (value.initiative === 'player' || value.initiative === 'enemy') &&
     Array.isArray(value.inventory) &&
     value.inventory.every(isValidRewardItem) &&
+    Array.isArray(value.spells) &&
+    value.spells.every(isValidLearnedSpell) &&
     (value.rewardState === undefined || isValidRewardState(value.rewardState))
   );
 };
@@ -136,7 +155,7 @@ export const saveGameStub = (state: GameState): string => {
 
   localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
 
-  return `저장 stub: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리를 localStorage에 기록했습니다.`;
+  return `저장 stub: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리, 보유 마법을 localStorage에 기록했습니다.`;
 };
 
 export const loadGameStub = (): GameState => {

@@ -67,6 +67,17 @@ export type RewardItem = {
   coin?: number;
   grade?: string;
   sell?: number;
+  mode?: 'random' | 'select';
+  learnedSpellName?: string;
+  learnedCircle?: number;
+};
+
+export type LearnedSpell = {
+  id: string;
+  name: string;
+  circle: number;
+  grade: string;
+  sourceItemName?: string;
 };
 
 export type RewardState = {
@@ -92,6 +103,7 @@ export type GameState = {
   turnOwner: TurnOwner;
   rewardState?: RewardState;
   inventory: RewardItem[];
+  spells: LearnedSpell[];
   battleResult?: BattleResult;
 };
 
@@ -179,7 +191,8 @@ export const createInitialGameState = (): GameState => {
     actionQueue: [],
     turnOwner: initiative,
     rewardState: undefined,
-    inventory: []
+    inventory: [],
+    spells: []
   };
 };
 
