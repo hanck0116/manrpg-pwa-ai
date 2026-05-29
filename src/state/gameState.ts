@@ -5,6 +5,8 @@ export type Position = {
   y: number;
 };
 
+export type Direction = 'up' | 'down' | 'left' | 'right';
+
 export type CoreStats = {
   level: number;
   strength: number;
@@ -26,6 +28,18 @@ export type Character = {
   guarding: boolean;
 };
 
+export type QueuedAction = {
+  id: string;
+  type: 'move' | 'basic-attack' | 'skill' | 'spell' | 'item' | 'defend' | 'wait';
+  label: string;
+  direction?: Direction;
+  steps?: number;
+};
+
+export type BattlePhase = 'player-main' | 'player-reaction' | 'enemy-main' | 'enemy-reaction' | 'battle-ended';
+export type TurnOwner = 'player' | 'enemy';
+export type BattleResult = 'win' | 'lose';
+
 export type GameLogEntry = {
   turn: number;
   message: string;
@@ -37,6 +51,11 @@ export type GameState = {
   enemy: Character;
   log: GameLogEntry[];
   selectedAction: string;
+  phase: BattlePhase;
+  initiative: TurnOwner;
+  actionQueue: QueuedAction[];
+  turnOwner: TurnOwner;
+  battleResult?: BattleResult;
 };
 
 export const createCharacter = (
@@ -53,9 +72,11 @@ export const createCharacter = (
   };
 };
 
-export const createInitialGameState = (): GameState => ({
-  turn: 1,
-  player: createCharacter({
+const getInitialInitiative = (player: Character, enemy: Character): TurnOwner =>
+  enemy.stats.dexterity > player.stats.dexterity ? 'enemy' : 'player';
+
+export const createInitialGameState = (): GameState => {
+  const player = createCharacter({
     id: 'player-1',
     name: '탐험자',
     kind: 'player',
@@ -68,8 +89,8 @@ export const createInitialGameState = (): GameState => ({
       wisdom: 8,
       dexterity: 10
     }
-  }),
-  enemy: createCharacter({
+  });
+  const enemy = createCharacter({
     id: 'enemy-1',
     name: '훈련용 고블린',
     kind: 'enemy',
@@ -82,15 +103,26 @@ export const createInitialGameState = (): GameState => ({
       wisdom: 4,
       dexterity: 6
     }
-  }),
-  log: [
-    {
-      turn: 1,
-      message: '고정 7x7 맵에 플레이어 1명과 적 1명이 배치되었습니다.'
-    }
-  ],
-  selectedAction: '대기'
-});
+  });
+  const initiative = getInitialInitiative(player, enemy);
+
+  return {
+    turn: 1,
+    player,
+    enemy,
+    log: [
+      {
+        turn: 1,
+        message: `고정 7x7 맵에 플레이어 1명과 적 1명이 배치되었습니다. 선턴: ${initiative === 'player' ? '플레이어' : '적'}`
+      }
+    ],
+    selectedAction: '대기',
+    phase: initiative === 'player' ? 'player-main' : 'enemy-main',
+    initiative,
+    actionQueue: [],
+    turnOwner: initiative
+  };
+};
 
 export const appendLog = (state: GameState, message: string): GameState => ({
   ...state,
