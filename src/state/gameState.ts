@@ -78,16 +78,16 @@ const getInitialInitiative = (player: Character, enemy: Character): TurnOwner =>
 export const createInitialGameState = (): GameState => {
   const player = createCharacter({
     id: 'player-1',
-    name: '탐험자',
+    name: '새 캐릭터',
     kind: 'player',
     position: { x: 3, y: 5 },
     stats: {
       level: 1,
-      strength: 12,
-      constitution: 12,
-      intelligence: 8,
-      wisdom: 8,
-      dexterity: 10
+      strength: 1,
+      constitution: 1,
+      intelligence: 1,
+      wisdom: 1,
+      dexterity: 1
     }
   });
   const enemy = createCharacter({
@@ -97,11 +97,11 @@ export const createInitialGameState = (): GameState => {
     position: { x: 3, y: 1 },
     stats: {
       level: 1,
-      strength: 8,
-      constitution: 8,
-      intelligence: 4,
-      wisdom: 4,
-      dexterity: 6
+      strength: 1,
+      constitution: 1,
+      intelligence: 1,
+      wisdom: 1,
+      dexterity: 1
     }
   });
   const initiative = getInitialInitiative(player, enemy);
