@@ -1,5 +1,5 @@
 import { enqueueAction, removeQueuedAction } from '../game/actionQueue';
-import { advanceTurn } from '../game/turn';
+import { advanceTurn, startBattle } from '../game/turn';
 import { fixedMap } from '../map/fixedMap';
 import { getMinimapSummary } from '../map/minimap';
 import { getDirectionLabel } from '../game/movement';
@@ -114,6 +114,8 @@ const renderActionQueue = (state: GameState): string => `
 
 const renderActionButtons = (state: GameState): string => {
   const disabled = state.phase !== 'player-main' ? 'disabled' : '';
+  const finishDisabled = state.phase !== 'player-main' ? 'disabled' : '';
+  const newBattleDisabled = state.phase === 'battle-ended' ? '' : 'disabled';
 
   return `
     <section class="panel actions">
@@ -144,8 +146,9 @@ const renderActionButtons = (state: GameState): string => {
           .map((type) => `<button type="button" data-add-action="${type}" ${disabled}>${actionLabels[type]} 추가</button>`)
           .join('')}
       </div>
-      <button type="button" class="finish-button" data-finish-turn ${state.phase === 'battle-ended' ? 'disabled' : ''}>턴 마무리</button>
-      ${state.phase === 'enemy-main' ? '<p class="muted">적 메인턴입니다. 턴 마무리를 누르면 적이 이동하거나 공격합니다.</p>' : ''}
+      <button type="button" class="finish-button" data-finish-turn ${finishDisabled}>턴 마무리</button>
+      <button type="button" data-new-battle ${newBattleDisabled}>새 전투 시작</button>
+      ${state.phase === 'enemy-main' ? '<p class="muted">적 메인턴은 자동 진행 대상입니다. 초기 선턴 등 예외 상황에서만 턴 마무리로 처리합니다.</p>' : ''}
       <div class="save-grid">
         <button type="button" data-save="save">저장 stub</button>
         <button type="button" data-save="load">불러오기 stub</button>
@@ -236,6 +239,13 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
 
     if (target.dataset.finishTurn !== undefined) {
       setState(advanceTurn(getState()));
+      return;
+    }
+
+    if (target.dataset.newBattle !== undefined) {
+      const currentState = getState();
+
+      setState(currentState.phase === 'battle-ended' ? startBattle() : appendLog(currentState, '전투 종료 상태에서만 새 전투를 시작할 수 있습니다.'));
       return;
     }
 

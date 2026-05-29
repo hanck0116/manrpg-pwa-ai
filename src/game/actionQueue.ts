@@ -2,9 +2,58 @@ import { moveCharacterSteps } from './movement';
 import { resolveBasicAttack } from '../rules/combat';
 import { appendLog, type GameState, type QueuedAction } from '../state/gameState';
 
+const hasBattleEnded = (state: GameState): boolean =>
+  state.phase === 'battle-ended' || state.player.hp <= 0 || state.enemy.hp <= 0;
+
+const withBattleEndedIfNeeded = (state: GameState): GameState => {
+  if (state.phase === 'battle-ended') {
+    return state;
+  }
+
+  if (state.enemy.hp <= 0) {
+    return appendLog(
+      {
+        ...state,
+        phase: 'battle-ended',
+        battleResult: 'win',
+        turnOwner: 'player',
+        actionQueue: []
+      },
+      '전투 종료: 적 HP가 0이 되어 남은 행동 큐를 실행하지 않습니다.'
+    );
+  }
+
+  if (state.player.hp <= 0) {
+    return appendLog(
+      {
+        ...state,
+        phase: 'battle-ended',
+        battleResult: 'lose',
+        turnOwner: 'enemy',
+        actionQueue: []
+      },
+      '전투 종료: 플레이어 HP가 0이 되어 남은 행동 큐를 실행하지 않습니다.'
+    );
+  }
+
+  return state;
+};
+
 export const enqueueAction = (state: GameState, action: QueuedAction): GameState => {
+  if (state.phase === 'battle-ended') {
+    return appendLog(state, '전투가 종료되어 행동을 추가할 수 없습니다.');
+  }
+
   if (state.phase !== 'player-main') {
     return appendLog(state, '플레이어 메인턴에서만 행동을 추가할 수 있습니다. 반응턴은 다음 단계에서 구현합니다.');
+  }
+
+  if (state.player.hp <= 0) {
+    return appendLog(state, '플레이어가 쓰러진 상태라 행동을 추가할 수 없습니다.');
+  }
+
+  if (action.type === 'basic-attack' && state.enemy.hp <= 0) {
+    return appendLog(state, '적이 이미 쓰러져 기본 공격 행동을 추가할 수 없습니다.');
   }
 
   return appendLog(
@@ -28,8 +77,8 @@ export const clearActionQueue = (state: GameState): GameState => ({
 });
 
 const executeQueuedAction = (state: GameState, action: QueuedAction): GameState => {
-  if (state.phase === 'battle-ended' || state.player.hp <= 0 || state.enemy.hp <= 0) {
-    return state;
+  if (hasBattleEnded(state)) {
+    return withBattleEndedIfNeeded(state);
   }
 
   const baseState = {
@@ -73,8 +122,17 @@ const executeQueuedAction = (state: GameState, action: QueuedAction): GameState 
 };
 
 export const executeActionQueue = (state: GameState): GameState => {
-  const queuedActions = state.actionQueue;
-  const executedState = queuedActions.reduce<GameState>(executeQueuedAction, state);
+  let currentState = state;
 
-  return clearActionQueue(executedState);
+  for (const action of state.actionQueue) {
+    currentState = withBattleEndedIfNeeded(currentState);
+
+    if (currentState.phase === 'battle-ended') {
+      return currentState;
+    }
+
+    currentState = executeQueuedAction(currentState, action);
+  }
+
+  return clearActionQueue(withBattleEndedIfNeeded(currentState));
 };
