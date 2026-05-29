@@ -1,0 +1,9 @@
+{
+  "name": "ManRPG PWA AI",
+  "short_name": "ManRPG",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#161821",
+  "theme_color": "#161821",
+  "description": "Local-first ManRPG PWA scaffold"
+}
