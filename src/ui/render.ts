@@ -1,5 +1,6 @@
 import { enqueueAction, removeQueuedAction } from '../game/actionQueue';
 import { clearFloorRecovery, enterNextFloor } from '../game/floor';
+import { applyFiveLevelPlus, canFinishLevelAllocation, finishLevelAllocation } from '../game/levelUp';
 import { createRewardOffer, claimSelectedRewards, toggleRewardSelection } from '../game/rewardFlow';
 import { advanceTurn, createNewBattleFromPlayer } from '../game/turn';
 import { fixedMap } from '../map/fixedMap';
@@ -37,6 +38,7 @@ const phaseLabels: Record<GameState['phase'], string> = {
   'enemy-reaction': '적 반응턴(TODO)',
   'floor-cleared': '층 클리어',
   'reward-pending': '보상 선택 대기',
+  'level-up-pending': '레벨업 스탯 분배',
   'battle-ended': '전투 종료'
 };
 
@@ -138,6 +140,43 @@ const renderStatAllocationPanel = (state: GameState): string => {
   `;
 };
 
+const renderLevelUpAllocationPanel = (state: GameState): string => {
+  if (state.setupMode || state.phase !== 'level-up-pending') {
+    return '';
+  }
+
+  return `
+    <section class="panel stat-allocation level-up-allocation">
+      <details open>
+        <summary>레벨업 스탯 분배</summary>
+        <p class="muted">보상 선택 후 다음 층에 진입하기 전에 레벨업으로 얻은 스탯 포인트를 모두 분배해야 합니다.</p>
+        <div class="setup-summary">
+          <span>현재 레벨 <strong>${state.player.stats.level}</strong></span>
+          <span>남은 포인트 <strong>${state.player.derived.remainingStatPoint}</strong></span>
+          <span>최대 스탯 <strong>${state.player.derived.maxStat}</strong></span>
+        </div>
+        <div class="stat-controls">
+          ${allocatableStatKeys
+            .map(
+              (statKey) => `
+                <div class="stat-row">
+                  <span>${statLabels[statKey]}</span>
+                  <button type="button" data-stat-decrease="${statKey}" ${canDecreaseStat(state, statKey) ? '' : 'disabled'}>-</button>
+                  <strong>${state.player.stats[statKey]}</strong>
+                  <button type="button" data-stat-increase="${statKey}" ${canIncreaseStat(state, statKey) ? '' : 'disabled'}>+</button>
+                </div>
+              `
+            )
+            .join('')}
+        </div>
+        <div class="setup-actions">
+          <button type="button" class="finish-button" data-finish-level-allocation ${canFinishLevelAllocation(state) ? '' : 'disabled'}>레벨업 분배 완료</button>
+        </div>
+      </details>
+    </section>
+  `;
+};
+
 const renderMap = (state: GameState): string => `
   <section class="panel map-panel" aria-label="7x7 고정 맵">
     <h2>7x7 고정 맵</h2>
@@ -233,7 +272,7 @@ const renderRewardPanel = (state: GameState): string => {
           .join('')}
       </div>
       <button type="button" class="finish-button" data-claim-rewards ${rewardState.claimed ? 'disabled' : ''}>보상 확정</button>
-      ${rewardState.claimed ? '<button type="button" class="finish-button" data-enter-next-floor>다음 층 진입</button>' : ''}
+      ${rewardState.claimed && !state.levelUpPending ? '<button type="button" class="finish-button" data-enter-next-floor>다음 층 진입</button>' : ''}
     </section>
   `;
 };
@@ -272,8 +311,8 @@ const renderActionQueue = (state: GameState): string => `
 `;
 
 const renderActionButtons = (state: GameState): string => {
-  const disabled = state.setupMode || state.phase !== 'player-main' ? 'disabled' : '';
-  const finishDisabled = state.setupMode || state.phase !== 'player-main' ? 'disabled' : '';
+  const disabled = state.setupMode || state.levelUpPending || state.phase !== 'player-main' ? 'disabled' : '';
+  const finishDisabled = state.setupMode || state.levelUpPending || state.phase !== 'player-main' ? 'disabled' : '';
   const newBattleDisabled = !state.setupMode && state.phase === 'battle-ended' ? '' : 'disabled';
 
   return `
@@ -281,6 +320,7 @@ const renderActionButtons = (state: GameState): string => {
       <h2>행동 추가</h2>
       <p class="muted">버튼은 즉시 실행하지 않고 큐에 쌓입니다. 턴 마무리 시 순서대로 실행됩니다.</p>
       ${state.setupMode ? '<p class="muted">캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.</p>' : ''}
+      ${state.levelUpPending ? '<p class="muted">레벨업 스탯 분배가 끝나야 전투 행동을 할 수 있습니다.</p>' : ''}
       <details open>
         <summary>이동</summary>
         <div class="choice-grid" data-direction-group>
@@ -327,6 +367,7 @@ const template = (state: GameState): string => `
 
     ${renderTurnStatus(state)}
     ${renderStatAllocationPanel(state)}
+    ${renderLevelUpAllocationPanel(state)}
     ${renderMap(state)}
 
     <section class="status-grid">
@@ -399,8 +440,13 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
       return;
     }
 
+    if (target.dataset.finishLevelAllocation !== undefined) {
+      setState(finishLevelAllocation(getState()));
+      return;
+    }
+
     if (target.dataset.clearFloor !== undefined) {
-      setState(createRewardOffer(clearFloorRecovery(getState())));
+      setState(createRewardOffer(applyFiveLevelPlus(clearFloorRecovery(getState()))));
       return;
     }
 

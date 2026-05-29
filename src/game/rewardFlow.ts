@@ -83,11 +83,13 @@ export const claimSelectedRewards = (state: GameState): GameState => {
         }
       },
       inventory: [...state.inventory, ...inventoryRewards],
+      phase: 'level-up-pending',
+      levelUpPending: true,
       rewardState: {
         ...state.rewardState,
         claimed: true
       }
     },
-    '보상을 획득했습니다. 다음 층에 진입할 수 있습니다.'
+    '보상을 획득했습니다. 레벨업 스탯 포인트를 분배해야 다음 층에 진입할 수 있습니다.'
   );
 };

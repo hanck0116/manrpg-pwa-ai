@@ -3,7 +3,7 @@ import { runEnemyMainTurn } from './enemyAI';
 import { appendLog, createInitialEnemy, type Character, type GameState } from '../state/gameState';
 
 const withBattleEndIfNeeded = (state: GameState): GameState => {
-  if (state.phase === 'battle-ended' || state.phase === 'floor-cleared' || state.phase === 'reward-pending') {
+  if (state.phase === 'battle-ended' || state.phase === 'floor-cleared' || state.phase === 'reward-pending' || state.phase === 'level-up-pending') {
     return state;
   }
 
@@ -61,6 +61,7 @@ export const createNewBattleFromPlayer = (state: GameState): GameState => {
     {
       ...state,
       setupMode: false,
+      levelUpPending: false,
       turn: 1,
       player,
       enemy,
@@ -84,7 +85,7 @@ const recoverPlayerMp = (state: GameState): GameState => ({
 });
 
 const runAutomaticEnemyTurn = (state: GameState): GameState => {
-  if (state.setupMode) {
+  if (state.setupMode || state.levelUpPending) {
     return state;
   }
 
@@ -101,7 +102,12 @@ const runAutomaticEnemyTurn = (state: GameState): GameState => {
   const afterEnemyAction = runEnemyMainTurn(enemyTurnState);
   const endedAfterEnemyAction = withBattleEndIfNeeded(afterEnemyAction);
 
-  if (endedAfterEnemyAction.phase === 'battle-ended' || endedAfterEnemyAction.phase === 'floor-cleared' || endedAfterEnemyAction.phase === 'reward-pending') {
+  if (
+    endedAfterEnemyAction.phase === 'battle-ended' ||
+    endedAfterEnemyAction.phase === 'floor-cleared' ||
+    endedAfterEnemyAction.phase === 'reward-pending' ||
+    endedAfterEnemyAction.phase === 'level-up-pending'
+  ) {
     return endedAfterEnemyAction;
   }
 
@@ -116,8 +122,8 @@ const runAutomaticEnemyTurn = (state: GameState): GameState => {
 };
 
 export const applyQueuedPlayerActions = (state: GameState): GameState => {
-  if (state.setupMode) {
-    return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
+  if (state.setupMode || state.levelUpPending) {
+    return appendLog(state, state.setupMode ? '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.' : '정비/보상/레벨업 단계에서는 전투 행동을 할 수 없습니다.');
   }
 
   if (state.phase !== 'player-main') {
@@ -132,8 +138,8 @@ export const applyQueuedPlayerActions = (state: GameState): GameState => {
 };
 
 export const finishPlayerMainTurn = (state: GameState): GameState => {
-  if (state.setupMode) {
-    return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
+  if (state.setupMode || state.levelUpPending) {
+    return appendLog(state, state.setupMode ? '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.' : '정비/보상/레벨업 단계에서는 전투 행동을 할 수 없습니다.');
   }
 
   if (state.phase !== 'player-main') {
@@ -143,7 +149,12 @@ export const finishPlayerMainTurn = (state: GameState): GameState => {
   const afterActions = applyQueuedPlayerActions(state);
   const endedAfterActions = withBattleEndIfNeeded(afterActions);
 
-  if (endedAfterActions.phase === 'battle-ended' || endedAfterActions.phase === 'floor-cleared' || endedAfterActions.phase === 'reward-pending') {
+  if (
+    endedAfterActions.phase === 'battle-ended' ||
+    endedAfterActions.phase === 'floor-cleared' ||
+    endedAfterActions.phase === 'reward-pending' ||
+    endedAfterActions.phase === 'level-up-pending'
+  ) {
     return endedAfterActions;
   }
 
@@ -153,8 +164,8 @@ export const finishPlayerMainTurn = (state: GameState): GameState => {
 };
 
 export const finishEnemyMainTurn = (state: GameState): GameState => {
-  if (state.setupMode) {
-    return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
+  if (state.setupMode || state.levelUpPending) {
+    return appendLog(state, state.setupMode ? '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.' : '정비/보상/레벨업 단계에서는 전투 행동을 할 수 없습니다.');
   }
 
   if (state.phase !== 'enemy-main') {
@@ -164,7 +175,12 @@ export const finishEnemyMainTurn = (state: GameState): GameState => {
   const afterEnemyAction = runEnemyMainTurn(state);
   const endedAfterEnemyAction = withBattleEndIfNeeded(afterEnemyAction);
 
-  if (endedAfterEnemyAction.phase === 'battle-ended' || endedAfterEnemyAction.phase === 'floor-cleared' || endedAfterEnemyAction.phase === 'reward-pending') {
+  if (
+    endedAfterEnemyAction.phase === 'battle-ended' ||
+    endedAfterEnemyAction.phase === 'floor-cleared' ||
+    endedAfterEnemyAction.phase === 'reward-pending' ||
+    endedAfterEnemyAction.phase === 'level-up-pending'
+  ) {
     return endedAfterEnemyAction;
   }
 
@@ -179,8 +195,8 @@ export const finishEnemyMainTurn = (state: GameState): GameState => {
 };
 
 export const advanceTurn = (state: GameState): GameState => {
-  if (state.setupMode) {
-    return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
+  if (state.setupMode || state.levelUpPending) {
+    return appendLog(state, state.setupMode ? '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.' : '정비/보상/레벨업 단계에서는 전투 행동을 할 수 없습니다.');
   }
 
   switch (state.phase) {
@@ -196,6 +212,8 @@ export const advanceTurn = (state: GameState): GameState => {
       return appendLog(state, '층 클리어 상태입니다. 회복/정비와 보상 선택을 진행하세요.');
     case 'reward-pending':
       return appendLog(state, '보상 선택 단계입니다. 다음 층 진입 후 전투 행동이 가능합니다.');
+    case 'level-up-pending':
+      return appendLog(state, '레벨업 스탯 분배 단계입니다. 남은 포인트를 모두 분배해야 다음 층에 진입할 수 있습니다.');
     case 'battle-ended':
       return appendLog(state, '전투가 종료되었습니다. 패배 상태에서는 새 전투 시작으로 같은 고정 맵에서 다시 시작할 수 있습니다.');
   }
