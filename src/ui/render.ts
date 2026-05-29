@@ -1,9 +1,19 @@
 import { enqueueAction, removeQueuedAction } from '../game/actionQueue';
-import { advanceTurn, startBattle } from '../game/turn';
+import { advanceTurn, createNewBattleFromPlayer } from '../game/turn';
 import { fixedMap } from '../map/fixedMap';
 import { getMinimapSummary } from '../map/minimap';
 import { getDirectionLabel } from '../game/movement';
 import { loadGameStub, saveGameStub } from '../storage/save';
+import {
+  allocatableStatKeys,
+  canDecreaseStat,
+  canIncreaseStat,
+  decreaseStat,
+  finishSetup,
+  increaseStat,
+  resetStats,
+  type AllocatableStatKey
+} from '../game/statAllocation';
 import type { Character, Direction, GameState, QueuedAction } from '../state/gameState';
 import { appendLog } from '../state/gameState';
 import { renderAISettings } from './aiSettings';
@@ -24,6 +34,15 @@ const phaseLabels: Record<GameState['phase'], string> = {
   'enemy-main': '적 메인턴',
   'enemy-reaction': '적 반응턴(TODO)',
   'battle-ended': '전투 종료'
+};
+
+const statLabels: Record<AllocatableStatKey, string> = {
+  strength: '힘',
+  dexterity: '민첩',
+  constitution: '체력',
+  intelligence: '지능',
+  wisdom: '지혜',
+  appearance: '외모'
 };
 
 const directionLabels: Record<Direction, string> = {
@@ -77,6 +96,43 @@ const renderCharacterCard = (character: Character): string => `
     </details>
   </section>
 `;
+
+const renderStatAllocationPanel = (state: GameState): string => {
+  if (!state.setupMode) {
+    return '';
+  }
+
+  return `
+    <section class="panel stat-allocation">
+      <details open>
+        <summary>캐릭터 생성</summary>
+        <p class="muted">총 스탯 60이 되도록 54포인트를 분배하세요.</p>
+        <div class="setup-summary">
+          <span>남은 포인트 <strong>${state.player.derived.remainingStatPoint}</strong></span>
+          <span>최대 스탯 <strong>${state.player.derived.maxStat}</strong></span>
+        </div>
+        <div class="stat-controls">
+          ${allocatableStatKeys
+            .map(
+              (statKey) => `
+                <div class="stat-row">
+                  <span>${statLabels[statKey]}</span>
+                  <button type="button" data-stat-decrease="${statKey}" ${canDecreaseStat(state, statKey) ? '' : 'disabled'}>-</button>
+                  <strong>${state.player.stats[statKey]}</strong>
+                  <button type="button" data-stat-increase="${statKey}" ${canIncreaseStat(state, statKey) ? '' : 'disabled'}>+</button>
+                </div>
+              `
+            )
+            .join('')}
+        </div>
+        <div class="setup-actions">
+          <button type="button" data-reset-stats>초기화</button>
+          <button type="button" class="finish-button" data-finish-setup ${state.player.derived.remainingStatPoint === 0 ? '' : 'disabled'}>생성 완료</button>
+        </div>
+      </details>
+    </section>
+  `;
+};
 
 const renderMap = (state: GameState): string => `
   <section class="panel map-panel" aria-label="7x7 고정 맵">
@@ -132,14 +188,15 @@ const renderActionQueue = (state: GameState): string => `
 `;
 
 const renderActionButtons = (state: GameState): string => {
-  const disabled = state.phase !== 'player-main' ? 'disabled' : '';
-  const finishDisabled = state.phase !== 'player-main' ? 'disabled' : '';
-  const newBattleDisabled = state.phase === 'battle-ended' ? '' : 'disabled';
+  const disabled = state.setupMode || state.phase !== 'player-main' ? 'disabled' : '';
+  const finishDisabled = state.setupMode || state.phase !== 'player-main' ? 'disabled' : '';
+  const newBattleDisabled = !state.setupMode && state.phase === 'battle-ended' ? '' : 'disabled';
 
   return `
     <section class="panel actions">
       <h2>행동 추가</h2>
       <p class="muted">버튼은 즉시 실행하지 않고 큐에 쌓입니다. 턴 마무리 시 순서대로 실행됩니다.</p>
+      ${state.setupMode ? '<p class="muted">캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.</p>' : ''}
       <details open>
         <summary>이동</summary>
         <div class="choice-grid" data-direction-group>
@@ -185,6 +242,7 @@ const template = (state: GameState): string => `
     </header>
 
     ${renderTurnStatus(state)}
+    ${renderStatAllocationPanel(state)}
     ${renderMap(state)}
 
     <section class="status-grid">
@@ -230,6 +288,28 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const addAction = target.dataset.addAction as QueuedAction['type'] | undefined;
     const removeActionId = target.dataset.removeAction;
     const saveAction = target.dataset.save;
+    const statIncrease = target.dataset.statIncrease as AllocatableStatKey | undefined;
+    const statDecrease = target.dataset.statDecrease as AllocatableStatKey | undefined;
+
+    if (statIncrease) {
+      setState(increaseStat(getState(), statIncrease));
+      return;
+    }
+
+    if (statDecrease) {
+      setState(decreaseStat(getState(), statDecrease));
+      return;
+    }
+
+    if (target.dataset.resetStats !== undefined) {
+      setState(resetStats(getState()));
+      return;
+    }
+
+    if (target.dataset.finishSetup !== undefined) {
+      setState(finishSetup(getState()));
+      return;
+    }
 
     if (target.dataset.moveDirection) {
       updateSelectedButton(target, '[data-move-direction]');
@@ -264,7 +344,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     if (target.dataset.newBattle !== undefined) {
       const currentState = getState();
 
-      setState(currentState.phase === 'battle-ended' ? startBattle() : appendLog(currentState, '전투 종료 상태에서만 새 전투를 시작할 수 있습니다.'));
+      setState(createNewBattleFromPlayer(currentState));
       return;
     }
 

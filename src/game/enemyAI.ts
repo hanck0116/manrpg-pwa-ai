@@ -14,6 +14,10 @@ const chooseDirectionTowardPlayer = (state: GameState): Direction => {
 };
 
 export const runEnemyMainTurn = (state: GameState): GameState => {
+  if (state.setupMode) {
+    return state;
+  }
+
   if (state.phase === 'battle-ended' || state.enemy.hp <= 0 || state.player.hp <= 0) {
     return state;
   }

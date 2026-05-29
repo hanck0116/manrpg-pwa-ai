@@ -40,6 +40,10 @@ const withBattleEndedIfNeeded = (state: GameState): GameState => {
 };
 
 export const enqueueAction = (state: GameState, action: QueuedAction): GameState => {
+  if (state.setupMode) {
+    return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
+  }
+
   if (state.phase === 'battle-ended') {
     return appendLog(state, '전투가 종료되어 행동을 추가할 수 없습니다.');
   }
@@ -122,6 +126,10 @@ const executeQueuedAction = (state: GameState, action: QueuedAction): GameState 
 };
 
 export const executeActionQueue = (state: GameState): GameState => {
+  if (state.setupMode) {
+    return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
+  }
+
   let currentState = state;
 
   for (const action of state.actionQueue) {
