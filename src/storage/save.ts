@@ -1,14 +1,17 @@
 import { calcDerivedStats } from '../rules/derivedStats';
-import { createInitialGameState, type Character, type CoreStats, type GameState } from '../state/gameState';
+import { createInitialGameState, type Character, type CoreStats, type GameState, type RewardItem, type RewardState } from '../state/gameState';
 
-const SAVE_KEY = 'manrpg-pwa-ai:save:v3';
-const LEGACY_SAVE_KEYS = ['manrpg-pwa-ai:save:v2', 'manrpg-pwa-ai:save:v1'];
-const SAVE_VERSION = 3;
+const SAVE_KEY = 'manrpg-pwa-ai:save:v4';
+const LEGACY_SAVE_KEYS = ['manrpg-pwa-ai:save:v3', 'manrpg-pwa-ai:save:v2', 'manrpg-pwa-ai:save:v1'];
+const SAVE_VERSION = 4;
 
 type SavePayload = {
   saveVersion: number;
   state: GameState;
 };
+
+const validPhases = ['player-main', 'player-reaction', 'enemy-main', 'enemy-reaction', 'floor-cleared', 'reward-pending', 'battle-ended'];
+const validRewardTypes: RewardItem['type'][] = ['coin', 'martial', 'magicBook', 'multi', 'reset', 'trait', 'special', 'item'];
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -59,6 +62,37 @@ const isValidCharacter = (value: unknown, kind: Character['kind']): value is Cha
   );
 };
 
+const isValidRewardItem = (value: unknown): value is RewardItem => {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.name === 'string' &&
+    validRewardTypes.includes(value.type as RewardItem['type']) &&
+    (value.coin === undefined || isNumber(value.coin)) &&
+    (value.grade === undefined || typeof value.grade === 'string') &&
+    (value.sell === undefined || isNumber(value.sell))
+  );
+};
+
+const isValidRewardState = (value: unknown): value is RewardState => {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    Array.isArray(value.offered) &&
+    value.offered.every(isValidRewardItem) &&
+    Array.isArray(value.selectedIds) &&
+    value.selectedIds.every((id) => typeof id === 'string') &&
+    isNumber(value.offerCount) &&
+    isNumber(value.pickCount) &&
+    typeof value.claimed === 'boolean'
+  );
+};
+
 const isValidGameState = (value: unknown): value is GameState => {
   if (!isObject(value)) {
     return false;
@@ -66,15 +100,19 @@ const isValidGameState = (value: unknown): value is GameState => {
 
   return (
     typeof value.setupMode === 'boolean' &&
+    isNumber(value.floor) &&
     isValidCharacter(value.player, 'player') &&
     isValidCharacter(value.enemy, 'enemy') &&
     Array.isArray(value.log) &&
     Array.isArray(value.actionQueue) &&
     typeof value.selectedAction === 'string' &&
     isNumber(value.turn) &&
-    typeof value.phase === 'string' &&
-    typeof value.turnOwner === 'string' &&
-    typeof value.initiative === 'string'
+    validPhases.includes(value.phase as string) &&
+    (value.turnOwner === 'player' || value.turnOwner === 'enemy') &&
+    (value.initiative === 'player' || value.initiative === 'enemy') &&
+    Array.isArray(value.inventory) &&
+    value.inventory.every(isValidRewardItem) &&
+    (value.rewardState === undefined || isValidRewardState(value.rewardState))
   );
 };
 
@@ -97,7 +135,7 @@ export const saveGameStub = (state: GameState): string => {
 
   localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
 
-  return `저장 stub: saveVersion ${SAVE_VERSION} 상태와 행동 큐를 localStorage에 기록했습니다.`;
+  return `저장 stub: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리를 localStorage에 기록했습니다.`;
 };
 
 export const loadGameStub = (): GameState => {

@@ -3,7 +3,7 @@ import { runEnemyMainTurn } from './enemyAI';
 import { appendLog, createInitialEnemy, type Character, type GameState } from '../state/gameState';
 
 const withBattleEndIfNeeded = (state: GameState): GameState => {
-  if (state.phase === 'battle-ended') {
+  if (state.phase === 'battle-ended' || state.phase === 'floor-cleared' || state.phase === 'reward-pending') {
     return state;
   }
 
@@ -11,12 +11,12 @@ const withBattleEndIfNeeded = (state: GameState): GameState => {
     return appendLog(
       {
         ...state,
-        phase: 'battle-ended',
+        phase: 'floor-cleared',
         battleResult: 'win',
         turnOwner: 'player',
         actionQueue: []
       },
-      '전투 종료: 적이 쓰러졌습니다. 승리!'
+      '층 클리어: 적이 쓰러졌습니다. 정비 단계로 이동할 수 있습니다.'
     );
   }
 
@@ -101,7 +101,7 @@ const runAutomaticEnemyTurn = (state: GameState): GameState => {
   const afterEnemyAction = runEnemyMainTurn(enemyTurnState);
   const endedAfterEnemyAction = withBattleEndIfNeeded(afterEnemyAction);
 
-  if (endedAfterEnemyAction.phase === 'battle-ended') {
+  if (endedAfterEnemyAction.phase === 'battle-ended' || endedAfterEnemyAction.phase === 'floor-cleared' || endedAfterEnemyAction.phase === 'reward-pending') {
     return endedAfterEnemyAction;
   }
 
@@ -143,7 +143,7 @@ export const finishPlayerMainTurn = (state: GameState): GameState => {
   const afterActions = applyQueuedPlayerActions(state);
   const endedAfterActions = withBattleEndIfNeeded(afterActions);
 
-  if (endedAfterActions.phase === 'battle-ended') {
+  if (endedAfterActions.phase === 'battle-ended' || endedAfterActions.phase === 'floor-cleared' || endedAfterActions.phase === 'reward-pending') {
     return endedAfterActions;
   }
 
@@ -164,7 +164,7 @@ export const finishEnemyMainTurn = (state: GameState): GameState => {
   const afterEnemyAction = runEnemyMainTurn(state);
   const endedAfterEnemyAction = withBattleEndIfNeeded(afterEnemyAction);
 
-  if (endedAfterEnemyAction.phase === 'battle-ended') {
+  if (endedAfterEnemyAction.phase === 'battle-ended' || endedAfterEnemyAction.phase === 'floor-cleared' || endedAfterEnemyAction.phase === 'reward-pending') {
     return endedAfterEnemyAction;
   }
 
@@ -192,7 +192,11 @@ export const advanceTurn = (state: GameState): GameState => {
     case 'enemy-reaction':
       // TODO: 반응은 턴을 소모하지 않는다는 원칙으로 다음 단계에서 실제 구현합니다.
       return appendLog(state, '반응턴은 다음 단계에서 구현합니다. 반응은 턴을 소모하지 않습니다.');
+    case 'floor-cleared':
+      return appendLog(state, '층 클리어 상태입니다. 회복/정비와 보상 선택을 진행하세요.');
+    case 'reward-pending':
+      return appendLog(state, '보상 선택 단계입니다. 다음 층 진입 후 전투 행동이 가능합니다.');
     case 'battle-ended':
-      return appendLog(state, '이미 전투가 종료되었습니다. 새 전투 시작 버튼으로 같은 고정 맵에서 다시 시작할 수 있습니다.');
+      return appendLog(state, '전투가 종료되었습니다. 패배 상태에서는 새 전투 시작으로 같은 고정 맵에서 다시 시작할 수 있습니다.');
   }
 };

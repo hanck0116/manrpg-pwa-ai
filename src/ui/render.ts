@@ -1,4 +1,6 @@
 import { enqueueAction, removeQueuedAction } from '../game/actionQueue';
+import { clearFloorRecovery, enterNextFloor } from '../game/floor';
+import { createRewardOffer, claimSelectedRewards, toggleRewardSelection } from '../game/rewardFlow';
 import { advanceTurn, createNewBattleFromPlayer } from '../game/turn';
 import { fixedMap } from '../map/fixedMap';
 import { getMinimapSummary } from '../map/minimap';
@@ -33,6 +35,8 @@ const phaseLabels: Record<GameState['phase'], string> = {
   'player-reaction': '플레이어 반응턴(TODO)',
   'enemy-main': '적 메인턴',
   'enemy-reaction': '적 반응턴(TODO)',
+  'floor-cleared': '층 클리어',
+  'reward-pending': '보상 선택 대기',
   'battle-ended': '전투 종료'
 };
 
@@ -164,12 +168,92 @@ const renderLog = (state: GameState): string => `
 const renderTurnStatus = (state: GameState): string => `
   <section class="panel turn-status">
     <h2>턴 상태</h2>
+    <p>현재 층: <strong>${state.floor}층</strong></p>
     <p>현재 phase: <strong>${phaseLabels[state.phase]}</strong></p>
     <p>현재 turnOwner: <strong>${state.turnOwner === 'player' ? '플레이어' : '적'}</strong></p>
     <p>선공: <strong>${state.initiative === 'player' ? '플레이어' : '적'}</strong></p>
+    ${state.phase === 'floor-cleared' ? '<p class="muted">적이 쓰러졌습니다. 정비 단계로 이동할 수 있습니다.</p>' : ''}
     ${state.battleResult ? `<p>결과: <strong>${state.battleResult === 'win' ? '승리' : '패배'}</strong></p>` : ''}
   </section>
 `;
+
+
+const describeReward = (reward: GameState['inventory'][number]): string => {
+  if (reward.type === 'coin') return `${reward.name} (${reward.coin ?? 0}코인)`;
+  if (reward.grade) return `${reward.name} / ${reward.grade} / 판매가 ${reward.sell ?? 0}코인`;
+  return `${reward.name} / 판매가 ${reward.sell ?? 0}코인`;
+};
+
+const renderFloorClearPanel = (state: GameState): string => {
+  if (state.phase !== 'floor-cleared') {
+    return '';
+  }
+
+  return `
+    <section class="panel floor-clear-panel">
+      <h2>층 클리어</h2>
+      <p class="muted">회복/정비 후 외모 기준 보상 후보를 생성합니다. 자동 코인 +1은 없습니다.</p>
+      <button type="button" class="finish-button" data-clear-floor>층 클리어 회복/정비</button>
+    </section>
+  `;
+};
+
+const renderRewardPanel = (state: GameState): string => {
+  if (state.phase !== 'reward-pending') {
+    return '';
+  }
+
+  const rewardState = state.rewardState;
+
+  if (!rewardState) {
+    return `
+      <section class="panel reward-panel">
+        <h2>보상 선택</h2>
+        <p class="muted">보상 후보가 없습니다.</p>
+        <button type="button" data-create-reward-offer>보상 후보 생성</button>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="panel reward-panel">
+      <h2>보상 선택</h2>
+      <p>후보 ${rewardState.offerCount}개 중 ${rewardState.pickCount}개 선택 · 현재 ${rewardState.selectedIds.length}개 선택</p>
+      <div class="reward-list">
+        ${rewardState.offered
+          .map((reward) => {
+            const selected = rewardState.selectedIds.includes(reward.id);
+            return `
+              <div class="reward-row ${selected ? 'selected' : ''}">
+                <span>${describeReward(reward)}</span>
+                <button type="button" data-toggle-reward="${reward.id}" ${rewardState.claimed ? 'disabled' : ''}>${selected ? '해제' : '선택'}</button>
+              </div>
+            `;
+          })
+          .join('')}
+      </div>
+      <button type="button" class="finish-button" data-claim-rewards ${rewardState.claimed ? 'disabled' : ''}>보상 확정</button>
+      ${rewardState.claimed ? '<button type="button" class="finish-button" data-enter-next-floor>다음 층 진입</button>' : ''}
+    </section>
+  `;
+};
+
+const renderInventorySummary = (state: GameState): string => {
+  const counts = state.inventory.reduce<Record<string, number>>((acc, item) => {
+    acc[item.name] = (acc[item.name] ?? 0) + 1;
+    return acc;
+  }, {});
+  const entries = Object.entries(counts);
+
+  return `
+    <section class="panel inventory-panel">
+      <details>
+        <summary>인벤토리 요약 (${state.inventory.length})</summary>
+        ${entries.length === 0 ? '<p class="muted">보유 아이템이 없습니다.</p>' : `<ul>${entries.map(([name, count]) => `<li>${name} × ${count}</li>`).join('')}</ul>`}
+      </details>
+    </section>
+  `;
+};
 
 const renderActionQueue = (state: GameState): string => `
   <section class="panel queue-panel">
@@ -255,6 +339,9 @@ const template = (state: GameState): string => `
       <p>${getMinimapSummary(state)}</p>
     </section>
 
+    ${renderFloorClearPanel(state)}
+    ${renderRewardPanel(state)}
+    ${renderInventorySummary(state)}
     ${renderActionQueue(state)}
     ${renderActionButtons(state)}
     ${renderAISettings()}
@@ -290,6 +377,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const saveAction = target.dataset.save;
     const statIncrease = target.dataset.statIncrease as AllocatableStatKey | undefined;
     const statDecrease = target.dataset.statDecrease as AllocatableStatKey | undefined;
+    const rewardId = target.dataset.toggleReward;
 
     if (statIncrease) {
       setState(increaseStat(getState(), statIncrease));
@@ -308,6 +396,31 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
 
     if (target.dataset.finishSetup !== undefined) {
       setState(finishSetup(getState()));
+      return;
+    }
+
+    if (target.dataset.clearFloor !== undefined) {
+      setState(createRewardOffer(clearFloorRecovery(getState())));
+      return;
+    }
+
+    if (target.dataset.createRewardOffer !== undefined) {
+      setState(createRewardOffer(getState()));
+      return;
+    }
+
+    if (rewardId) {
+      setState(toggleRewardSelection(getState(), rewardId));
+      return;
+    }
+
+    if (target.dataset.claimRewards !== undefined) {
+      setState(claimSelectedRewards(getState()));
+      return;
+    }
+
+    if (target.dataset.enterNextFloor !== undefined) {
+      setState(enterNextFloor(getState()));
       return;
     }
 
