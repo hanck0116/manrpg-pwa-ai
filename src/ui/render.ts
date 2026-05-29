@@ -51,11 +51,30 @@ const renderCharacterCard = (character: Character): string => `
     <dl>
       <div><dt>HP</dt><dd>${character.hp} / ${character.derived.maxHP}</dd></div>
       <div><dt>MP</dt><dd>${character.mp} / ${character.derived.maxMP}</dd></div>
-      <div><dt>민첩</dt><dd>${character.stats.dexterity}</dd></div>
-      <div><dt>평타</dt><dd>${character.derived.basicAtk}</dd></div>
-      <div><dt>MP 회복</dt><dd>${character.derived.mpRegen}</dd></div>
+      <div><dt>레벨</dt><dd>${character.stats.level}</dd></div>
+      <div><dt>최종 공격력</dt><dd>${character.derived.attack}</dd></div>
+      <div><dt>코인</dt><dd>${character.stats.coin}</dd></div>
       <div><dt>좌표</dt><dd>${character.position.x + 1}, ${character.position.y + 1}</dd></div>
     </dl>
+    <details>
+      <summary>상세 스탯</summary>
+      <dl>
+        <div><dt>힘</dt><dd>${character.stats.strength}</dd></div>
+        <div><dt>민첩</dt><dd>${character.stats.dexterity}</dd></div>
+        <div><dt>체력</dt><dd>${character.stats.constitution}</dd></div>
+        <div><dt>지능</dt><dd>${character.stats.intelligence}</dd></div>
+        <div><dt>지혜</dt><dd>${character.stats.wisdom}</dd></div>
+        <div><dt>외모</dt><dd>${character.stats.appearance}</dd></div>
+        <div><dt>남은 스탯 포인트</dt><dd>${character.derived.remainingStatPoint}</dd></div>
+        <div><dt>최대 스탯</dt><dd>${character.derived.maxStat}</dd></div>
+        <div><dt>외공</dt><dd>${character.stats.outerStack} (${character.derived.outerMultiplier.toFixed(2)}배)</dd></div>
+        <div><dt>내공</dt><dd>${character.stats.innerStack} (${character.derived.innerMultiplier.toFixed(2)}배)</dd></div>
+        <div><dt>검기</dt><dd>${character.derived.swordKiName}</dd></div>
+        <div><dt>기본 공격력</dt><dd>${character.derived.basicAtk}</dd></div>
+        <div><dt>멀티캐스팅</dt><dd>${character.derived.multi}</dd></div>
+        <div><dt>MP 회복</dt><dd>${character.derived.mpRegen}</dd></div>
+      </dl>
+    </details>
   </section>
 `;
 

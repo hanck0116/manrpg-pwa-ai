@@ -14,6 +14,13 @@ export type CoreStats = {
   intelligence: number;
   wisdom: number;
   dexterity: number;
+  appearance: number;
+  outerStack: number;
+  innerStack: number;
+  swordKi: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  multicasting: number;
+  traits: string[];
+  coin: number;
 };
 
 export type Character = {
@@ -84,10 +91,17 @@ export const createInitialGameState = (): GameState => {
     stats: {
       level: 1,
       strength: 1,
+      dexterity: 1,
       constitution: 1,
       intelligence: 1,
       wisdom: 1,
-      dexterity: 1
+      appearance: 1,
+      outerStack: 0,
+      innerStack: 0,
+      swordKi: 0,
+      multicasting: 1,
+      traits: [],
+      coin: 0
     }
   });
   const enemy = createCharacter({
@@ -98,10 +112,17 @@ export const createInitialGameState = (): GameState => {
     stats: {
       level: 1,
       strength: 1,
+      dexterity: 1,
       constitution: 1,
       intelligence: 1,
       wisdom: 1,
-      dexterity: 1
+      appearance: 1,
+      outerStack: 0,
+      innerStack: 0,
+      swordKi: 0,
+      multicasting: 1,
+      traits: [],
+      coin: 0
     }
   });
   const initiative = getInitialInitiative(player, enemy);

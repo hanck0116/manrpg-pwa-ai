@@ -2,7 +2,7 @@
 
 ManRPG를 **실행 가능한 PWA 기본 골격 + 로컬 규칙 엔진 + 고정 7x7 맵 + 1인 전투 루프**로 구성하는 진행 중 구현입니다.
 
-현재 단계의 최우선 목표는 “플레이어 1명과 적 1명의 기본 전투 루프를 실제 플레이 가능한 형태로 고정한다”입니다.
+현재 단계의 목표는 “원본 통합본 기준으로 로컬 규칙 엔진의 파생 수치, 다이스 판정, 전투 계산 구조를 정리한다”입니다.
 
 - Vite + TypeScript 기반
 - API 키 없이도 화면 표시
@@ -28,9 +28,7 @@ ManRPG를 **실행 가능한 PWA 기본 골격 + 로컬 규칙 엔진 + 고정 7
 - `source/extracted/최종_층별_적목록.txt`
 - `source/extracted/최종_적_시트_프론트매터_요약.txt`
 
-플레이어 시트 원문에는 기본 플레이어가 `이름: 새 캐릭터`, `구분: 플레이어`, `레벨: 1`, 힘/민첩/체력/지능/지혜가 모두 1인 1인 시트로 들어 있습니다. 현재 전투 상태의 플레이어는 이 1명만 사용합니다.
-
-다만 현재 `src/rules/*`의 세부 전투 공식은 앱 골격을 유지하기 위한 임시 구현입니다. 원본 통합본의 세부 공식과 충돌하면 통합본을 우선합니다.
+플레이어 시트 원문에는 기본 플레이어가 `이름: 새 캐릭터`, `구분: 플레이어`, `레벨: 1`, 힘/민첩/체력/지능/지혜/외모가 모두 1인 1인 시트로 들어 있습니다. 현재 전투 상태의 플레이어는 이 1명만 사용합니다.
 
 ## 실행 방법
 
@@ -55,6 +53,8 @@ npm run worker:check
 - 7x7 고정 맵 표시
 - 플레이어 1명과 적 1명 표시
 - 플레이어/적 상태창 표시
+  - 기본 화면: HP, MP, 레벨, 최종 공격력, 코인, 좌표
+  - 접이식 상세 스탯: 힘/민첩/체력/지능/지혜/외모, 남은 스탯 포인트, 외공, 내공, 검기 이름, 기본 공격력, 멀티캐스팅, MP 회복
 - 현재 phase, turnOwner, 선공 표시
 - 민첩 비교 기반 전투 시작 선공 결정
   - 플레이어 민첩과 적 민첩 비교
@@ -74,8 +74,10 @@ npm run worker:check
 - 기본 공격
   - 인접한 대상에게만 공격 가능
   - 대상 HP가 0이면 공격하지 않음
-  - 민첩이 상대의 2배 이상이면 기본 공격 추가타 발생
-  - 공격 로그에 1타/2타 여부 표시
+  - 최종 공격력(`derived.attack`) 기반 피해 적용
+  - 민첩이 상대의 2배 이상이면 기본 공격 추가타 1회 발생
+  - 공격 결과에 `hits`, `damagePerHit`, `totalDamage`, 기존 호환용 `damage` 포함
+  - 공격 로그에 1타/2타, 타당 피해, 총 피해 표시
 - 적 메인턴 임시 AI
   - 적이 플레이어와 인접하면 기본 공격
   - 인접하지 않으면 플레이어 방향으로 1칸 이동
@@ -99,40 +101,77 @@ npm run worker:check
   - 계단 미구현 표시
 - 전투 로그 최근 20개 표시
 - 저장/불러오기 stub
-  - `saveVersion: 1`
+  - `saveVersion: 2`
+  - `appearance`, `outerStack`, `innerStack`, `swordKi`, `multicasting`, `traits`, `coin`이 포함된 현재 구조만 유효 저장으로 취급
+  - saveVersion 1 데이터 또는 깨진 저장 데이터는 초기 상태로 복구
   - actionQueue 저장/복구
-  - 깨진 저장 데이터는 초기 상태로 복구
 - 접이식 AI 설정 패널 자리
 - Cloudflare Worker stub
 - AI 라우터 및 provider stub
 
+## 로컬 규칙 엔진 구현 상태
+
+원본 통합본의 최종 파생 수치 규칙을 현재 상태 구조에 맞춰 TypeScript로 이식했습니다.
+
+- 시작 CoreStats
+  - `level = 1`
+  - `strength = 1`
+  - `dexterity = 1`
+  - `constitution = 1`
+  - `intelligence = 1`
+  - `wisdom = 1`
+  - `appearance = 1`
+  - `outerStack = 0`
+  - `innerStack = 0`
+  - `swordKi = 0`
+  - `multicasting = 1`
+  - `traits = []`
+  - `coin = 0`
+- 파생 수치
+  - `totalStatPoint = 60 + (level - 1) * 3`
+  - `usedStatPoint = strength + dexterity + constitution + intelligence + wisdom + appearance`
+  - `remainingStatPoint = totalStatPoint - usedStatPoint`
+  - `maxStat = level >= 80 ? 100 : level + 20`
+  - `maxHP = floor(constitution * 10 * 1.4^outerStack)`, 최소 1
+  - `maxMP = floor((level * 5 + intelligence * 10) * 1.2^innerStack + swordKiMpDelta)`, 최소 0
+  - `mpRegen = floor((level + wisdom * 2) * 1.2^innerStack)`, 최소 0
+  - `basicAtk = floor((strength + constitution) / 10) + 2`
+  - `attack = floor(basicAtk * swordKiAtkMul * attackTraitMultiplier)`, 최소 0
+  - `multi = multicasting * 2` if `traits` includes `시분할`, otherwise `multicasting`
+- 검기 테이블
+  - 0 없음: 공격 1배, MP 변화 0
+  - 1 검기상인: 공격 1.5배, MP -50
+  - 2 검기: 공격 2배, MP -150
+  - 3 검사: 공격 5배, MP -300
+  - 4 검강: 공격 20배, MP -700
+  - 5 강기압환: 공격 50배, MP -500
+  - 6 심검: 공격 50배, MP +1,000,000
+- 공격 특성 배수
+  - 연혼염 x1.15
+  - 흑염의 영체화 x1.1
+  - 헤일로 x1.25
+  - 입천 x1.3
+  - 앙케 라 x1.5
+- 다이스
+  - 일반 판정 `rollStatCheck(effectiveStat, bonus)`은 `1d[유효스탯]` 결과와 보정 합계만 반환하며 성공조건은 호출 규칙이 결정
+  - 절대 판정 `rollAbsoluteCheck(effectiveStat, bonus)`은 `1d100 <= effectiveStat + bonus`
+- 보상
+  - 외모 기반 보상 후보 수/선택 수 `getRewardConfig(appearance)` 구현
+
 ## 아직 미구현/TODO
 
-- 원본 zip 확인 결과를 세부 로컬 규칙에 완전히 동기화
-- 1인 플레이어 시트 동기화 고도화
+- 총 시작 스탯 60, 추가 분배 포인트 54를 사용하는 캐릭터 생성/분배 UI
+- 일반 판정의 상황별 성공조건 정리
+- 심법, 심적초월, 불멸, 자기상환적 돌연변이 등 상태 필드가 더 필요한 파생 수치
 - 반응턴 실제 구현
 - 스킬 실제 효과 구현
-- 마법/아이템/장비 구현
-- 보상/상점 구현
+- 마법/마법서 구현
+- 아이템/장비 구현
+- 상점 구현
+- 층 클리어/보상 선택 UI
 - AI provider 실제 호출
 - Worker relay 구현
 - 테스트 코드 추가
-
-## 로컬 규칙 엔진 1차 구현
-
-원본 zip은 확인했지만 세부 공식 동기화 전이므로 다음 공식은 임시 구현입니다.
-
-- `maxHP = 체력 * 10`
-- `maxMP = 레벨 * 5 + 지능 * 10`
-- `mpRegen = 레벨 + 지혜 * 2`
-- `basicAtk = floor((힘 + 체력) / 10) + 2`
-- `rollStatCheck(effectiveStat, bonus)`
-- `rollAbsoluteCheck(effectiveStat, bonus)`
-- `resolveBasicAttack(actor, target)`
-  - 인접 대상만 공격
-  - 대상 HP 0이면 공격하지 않음
-  - 민첩이 상대의 2배 이상이면 기본 공격 추가타
-  - 결과에 `hits`를 포함하고 로그에 1타/2타를 표시
 
 ## AI 라우터 1차 구현
 
