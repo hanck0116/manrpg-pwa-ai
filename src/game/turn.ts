@@ -1,77 +1,117 @@
-import { isWalkable } from '../map/fixedMap';
-import { resolveBasicAttack } from '../rules/combat';
-import { appendLog, type GameState, type Position } from '../state/gameState';
+import { executeActionQueue } from './actionQueue';
+import { runEnemyMainTurn } from './enemyAI';
+import { appendLog, createInitialGameState, type GameState } from '../state/gameState';
 
-export type PlayerAction = 'move' | 'basic-attack' | 'skill' | 'spell' | 'item' | 'defend' | 'wait' | 'end-turn';
+const withBattleEndIfNeeded = (state: GameState): GameState => {
+  if (state.enemy.hp <= 0) {
+    return appendLog(
+      {
+        ...state,
+        phase: 'battle-ended',
+        battleResult: 'win',
+        turnOwner: 'player',
+        actionQueue: []
+      },
+      '전투 종료: 적이 쓰러졌습니다. 승리!'
+    );
+  }
 
-const nextPosition = (position: Position): Position => ({
-  x: position.x,
-  y: Math.max(0, position.y - 1)
+  if (state.player.hp <= 0) {
+    return appendLog(
+      {
+        ...state,
+        phase: 'battle-ended',
+        battleResult: 'lose',
+        turnOwner: 'enemy',
+        actionQueue: []
+      },
+      '전투 종료: 플레이어가 쓰러졌습니다. 패배.'
+    );
+  }
+
+  return state;
+};
+
+const recoverPlayerMp = (state: GameState): GameState => ({
+  ...state,
+  player: {
+    ...state.player,
+    mp: Math.min(state.player.derived.maxMP, state.player.mp + state.player.derived.mpRegen)
+  }
 });
 
-export const applyPlayerAction = (state: GameState, action: PlayerAction): GameState => {
-  const baseState = {
-    ...state,
-    player: { ...state.player, guarding: false },
-    enemy: { ...state.enemy, guarding: false },
-    selectedAction: action
-  };
+export const startBattle = (): GameState => createInitialGameState();
 
-  switch (action) {
-    case 'move': {
-      const target = nextPosition(baseState.player.position);
-      const occupiedByEnemy = target.x === baseState.enemy.position.x && target.y === baseState.enemy.position.y;
+export const applyQueuedPlayerActions = (state: GameState): GameState => {
+  if (state.phase !== 'player-main') {
+    return appendLog(state, '플레이어 메인턴이 아니라 행동 큐를 실행할 수 없습니다.');
+  }
 
-      if (!isWalkable(target.x, target.y) || occupiedByEnemy) {
-        return appendLog(baseState, '이동할 수 없는 칸입니다. 1차 구현은 위쪽 1칸 이동만 지원합니다.');
-      }
+  if (state.actionQueue.length === 0) {
+    return appendLog(state, '행동 큐가 비어 있습니다. 대기한 것으로 처리합니다.');
+  }
 
-      return appendLog(
-        {
-          ...baseState,
-          player: { ...baseState.player, position: target }
-        },
-        '플레이어가 위쪽으로 1칸 이동했습니다.'
-      );
-    }
-    case 'basic-attack': {
-      const result = resolveBasicAttack(baseState.player, baseState.enemy);
+  return executeActionQueue(state);
+};
 
-      return appendLog(
-        {
-          ...baseState,
-          enemy: { ...baseState.enemy, hp: result.targetHp }
-        },
-        result.log
-      );
-    }
-    case 'defend':
-      return appendLog(
-        {
-          ...baseState,
-          player: { ...baseState.player, guarding: true }
-        },
-        '플레이어가 방어 자세를 취했습니다.'
-      );
-    case 'end-turn':
-      return appendLog(
-        {
-          ...baseState,
-          turn: baseState.turn + 1,
-          player: {
-            ...baseState.player,
-            mp: Math.min(baseState.player.derived.maxMP, baseState.player.mp + baseState.player.derived.mpRegen)
-          }
-        },
-        '턴을 마무리했습니다. MP가 회복됩니다.'
-      );
-    case 'skill':
-      return appendLog(baseState, '스킬은 원본 규칙 확인 후 구현 예정입니다.');
-    case 'spell':
-      return appendLog(baseState, '마법은 원본 규칙 확인 후 구현 예정입니다.');
-    case 'item':
-      return appendLog(baseState, '아이템은 저장/인벤토리 규칙 확인 후 구현 예정입니다.');
-    case 'wait':
-      return appendLog(baseState, '플레이어가 대기했습니다.');
+export const finishPlayerMainTurn = (state: GameState): GameState => {
+  if (state.phase !== 'player-main') {
+    return appendLog(state, '현재는 플레이어 메인턴이 아닙니다.');
+  }
+
+  const afterActions = applyQueuedPlayerActions(state);
+  const endedAfterActions = withBattleEndIfNeeded(afterActions);
+
+  if (endedAfterActions.phase === 'battle-ended') {
+    return endedAfterActions;
+  }
+
+  const recoveredState = recoverPlayerMp(endedAfterActions);
+
+  return appendLog(
+    {
+      ...recoveredState,
+      phase: 'enemy-main',
+      turnOwner: 'enemy',
+      turn: recoveredState.turn + 1
+    },
+    '플레이어 메인턴을 마무리했습니다. MP가 회복되고 적 메인턴으로 전환됩니다.'
+  );
+};
+
+export const finishEnemyMainTurn = (state: GameState): GameState => {
+  if (state.phase !== 'enemy-main') {
+    return appendLog(state, '현재는 적 메인턴이 아닙니다.');
+  }
+
+  const afterEnemyAction = runEnemyMainTurn(state);
+  const endedAfterEnemyAction = withBattleEndIfNeeded(afterEnemyAction);
+
+  if (endedAfterEnemyAction.phase === 'battle-ended') {
+    return endedAfterEnemyAction;
+  }
+
+  return appendLog(
+    {
+      ...endedAfterEnemyAction,
+      phase: 'player-main',
+      turnOwner: 'player'
+    },
+    '적 메인턴이 끝났습니다. 플레이어 메인턴으로 돌아옵니다.'
+  );
+};
+
+export const advanceTurn = (state: GameState): GameState => {
+  switch (state.phase) {
+    case 'player-main':
+      return finishPlayerMainTurn(state);
+    case 'enemy-main':
+      return finishEnemyMainTurn(state);
+    case 'player-reaction':
+    case 'enemy-reaction':
+      // TODO: 반응은 턴을 소모하지 않는다는 원칙으로 다음 단계에서 실제 구현합니다.
+      return appendLog(state, '반응턴은 다음 단계에서 구현합니다. 반응은 턴을 소모하지 않습니다.');
+    case 'battle-ended':
+      return appendLog(state, '이미 전투가 종료되었습니다.');
   }
 };
