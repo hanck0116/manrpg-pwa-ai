@@ -1,16 +1,16 @@
 import { calcDerivedStats } from '../rules/derivedStats';
 import { createInitialGameState, type Character, type CoreStats, type GameState, type RewardItem, type RewardState } from '../state/gameState';
 
-const SAVE_KEY = 'manrpg-pwa-ai:save:v4';
-const LEGACY_SAVE_KEYS = ['manrpg-pwa-ai:save:v3', 'manrpg-pwa-ai:save:v2', 'manrpg-pwa-ai:save:v1'];
-const SAVE_VERSION = 4;
+const SAVE_KEY = 'manrpg-pwa-ai:save:v5';
+const LEGACY_SAVE_KEYS = ['manrpg-pwa-ai:save:v4', 'manrpg-pwa-ai:save:v3', 'manrpg-pwa-ai:save:v2', 'manrpg-pwa-ai:save:v1'];
+const SAVE_VERSION = 5;
 
 type SavePayload = {
   saveVersion: number;
   state: GameState;
 };
 
-const validPhases = ['player-main', 'player-reaction', 'enemy-main', 'enemy-reaction', 'floor-cleared', 'reward-pending', 'battle-ended'];
+const validPhases = ['player-main', 'player-reaction', 'enemy-main', 'enemy-reaction', 'floor-cleared', 'reward-pending', 'level-up-pending', 'battle-ended'];
 const validRewardTypes: RewardItem['type'][] = ['coin', 'martial', 'magicBook', 'multi', 'reset', 'trait', 'special', 'item'];
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -100,6 +100,7 @@ const isValidGameState = (value: unknown): value is GameState => {
 
   return (
     typeof value.setupMode === 'boolean' &&
+    typeof value.levelUpPending === 'boolean' &&
     isNumber(value.floor) &&
     isValidCharacter(value.player, 'player') &&
     isValidCharacter(value.enemy, 'enemy') &&

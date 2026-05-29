@@ -29,6 +29,10 @@ export const enterNextFloor = (state: GameState): GameState => {
     return appendLog(state, '보상을 확정해야 다음 층에 진입할 수 있습니다.');
   }
 
+  if (state.phase === 'level-up-pending' || state.levelUpPending || state.player.derived.remainingStatPoint !== 0) {
+    return appendLog(state, '레벨업으로 얻은 스탯 포인트를 모두 분배해야 다음 층에 진입할 수 있습니다.');
+  }
+
   const enemy = createInitialEnemy();
   const positionedState = {
     ...state,
@@ -49,6 +53,7 @@ export const enterNextFloor = (state: GameState): GameState => {
     {
       ...positionedState,
       setupMode: false,
+      levelUpPending: false,
       selectedAction: '대기',
       phase: initiative === 'player' ? 'player-main' : 'enemy-main',
       initiative,

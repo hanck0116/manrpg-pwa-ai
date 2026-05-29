@@ -50,6 +50,7 @@ export type BattlePhase =
   | 'enemy-reaction'
   | 'floor-cleared'
   | 'reward-pending'
+  | 'level-up-pending'
   | 'battle-ended';
 export type TurnOwner = 'player' | 'enemy';
 export type BattleResult = 'win' | 'lose';
@@ -78,6 +79,7 @@ export type RewardState = {
 
 export type GameState = {
   setupMode: boolean;
+  levelUpPending: boolean;
   turn: number;
   floor: number;
   player: Character;
@@ -160,6 +162,7 @@ export const createInitialGameState = (): GameState => {
 
   return {
     setupMode: true,
+    levelUpPending: false,
     floor: 1,
     turn: 1,
     player,

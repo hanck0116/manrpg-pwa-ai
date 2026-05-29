@@ -30,11 +30,13 @@ const withRefreshedPlayer = (state: GameState, player: Character): GameState => 
   player: refreshPlayerVitals(player)
 });
 
+const canAllocateStats = (state: GameState): boolean => state.setupMode || state.levelUpPending;
+
 export const canIncreaseStat = (state: GameState, statKey: AllocatableStatKey): boolean =>
-  state.setupMode && state.player.derived.remainingStatPoint > 0 && state.player.stats[statKey] < state.player.derived.maxStat;
+  canAllocateStats(state) && state.player.derived.remainingStatPoint > 0 && state.player.stats[statKey] < state.player.derived.maxStat;
 
 export const canDecreaseStat = (state: GameState, statKey: AllocatableStatKey): boolean =>
-  state.setupMode && state.player.stats[statKey] > MIN_STAT;
+  canAllocateStats(state) && state.player.stats[statKey] > MIN_STAT;
 
 export const increaseStat = (state: GameState, statKey: AllocatableStatKey): GameState => {
   if (!canIncreaseStat(state, statKey)) {
@@ -64,8 +66,12 @@ export const decreaseStat = (state: GameState, statKey: AllocatableStatKey): Gam
   });
 };
 
-export const resetStats = (state: GameState): GameState =>
-  withRefreshedPlayer(
+export const resetStats = (state: GameState): GameState => {
+  if (!state.setupMode || state.levelUpPending) {
+    return state;
+  }
+
+  return withRefreshedPlayer(
     {
       ...state,
       setupMode: true
@@ -83,6 +89,7 @@ export const resetStats = (state: GameState): GameState =>
       }
     }
   );
+};
 
 export const finishSetup = (state: GameState): GameState => {
   if (!state.setupMode) {
