@@ -16,6 +16,11 @@ const removeItemWithoutLog = (state: GameState, itemId: string): GameState => ({
   inventory: state.inventory.filter((item) => item.id !== itemId)
 });
 
+const isOuterStackItem = (item: RewardItem): boolean => item.name === '외공서' || item.name === 'Outer Stack Manual';
+const isInnerStackItem = (item: RewardItem): boolean => item.name === '내공서' || item.name === 'Inner Stack Manual';
+const isSwordKiItem = (item: RewardItem): boolean => item.name === '검기' || item.name === 'Sword Ki Manual';
+const isMulticastingItem = (item: RewardItem): boolean => item.name === '멀티캐스팅의 서' || item.name === 'Multicasting Manual';
+
 export const removeInventoryItem = (state: GameState, itemId: string): GameState => {
   const item = findInventoryItem(state, itemId);
 
@@ -37,17 +42,17 @@ export const useInventoryItem = (state: GameState, itemId: string): GameState =>
     return appendLog(state, '인벤토리에서 해당 아이템을 찾을 수 없습니다.');
   }
 
-  if (item.name === '외공서') {
+  if (isOuterStackItem(item)) {
     const updated = updatePlayerStats(removeItemWithoutLog(state, itemId), (stats) => ({ ...stats, outerStack: stats.outerStack + 1 }));
     return appendLog(updated, '외공서 사용: 외공이 1 증가했습니다.');
   }
 
-  if (item.name === '내공서') {
+  if (isInnerStackItem(item)) {
     const updated = updatePlayerStats(removeItemWithoutLog(state, itemId), (stats) => ({ ...stats, innerStack: stats.innerStack + 1 }));
     return appendLog(updated, '내공서 사용: 내공이 1 증가했습니다.');
   }
 
-  if (item.name === '검기') {
+  if (isSwordKiItem(item)) {
     if (state.player.stats.swordKi >= 6) {
       return appendLog(state, '검기 사용 불가: 검기 단계는 이미 최대 6입니다.');
     }
@@ -59,7 +64,7 @@ export const useInventoryItem = (state: GameState, itemId: string): GameState =>
     return appendLog(updated, '검기 사용: 검기 단계가 상승했습니다.');
   }
 
-  if (item.name === '멀티캐스팅의 서') {
+  if (isMulticastingItem(item)) {
     const updated = updatePlayerStats(removeItemWithoutLog(state, itemId), (stats) => ({ ...stats, multicasting: stats.multicasting + 1 }));
     return appendLog(updated, '멀티캐스팅의 서 사용: 멀티캐스팅이 1 증가했습니다.');
   }
@@ -93,6 +98,29 @@ export const useInventoryItem = (state: GameState, itemId: string): GameState =>
   }
 
   return appendLog(state, '이 아이템의 사용 효과는 아직 구현되지 않았습니다.');
+};
+
+export const canUseItemInBattle = (item: RewardItem): boolean =>
+  item.type === 'item' && item.mode === 'select' && item.learnedSpellName === 'combat-usable';
+
+export const getBattleUsableItems = (state: GameState): RewardItem[] => state.inventory.filter(canUseItemInBattle);
+
+export const useBattleInventoryItem = (state: GameState, itemId: string): GameState => {
+  if (state.phase !== 'player-main') {
+    return appendLog(state, 'Battle items can only be queued from the player main phase.');
+  }
+
+  const item = findInventoryItem(state, itemId);
+
+  if (!item) {
+    return appendLog(state, 'Use item failed: the selected inventory item was not found.');
+  }
+
+  if (!canUseItemInBattle(item)) {
+    return appendLog(state, `${item.name} cannot be used during battle. TODO: no source combat-use effect is defined for this item.`);
+  }
+
+  return appendLog(state, `${item.name} has no implemented battle effect yet. TODO: wire source-defined combat consumables only.`);
 };
 
 export const sellInventoryItem = (state: GameState, itemId: string): GameState => {

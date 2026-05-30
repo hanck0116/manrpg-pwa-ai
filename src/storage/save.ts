@@ -1,9 +1,17 @@
 import { calcDerivedStats } from '../rules/derivedStats';
 import { createInitialGameState, type Character, type CoreStats, type GameState, type LearnedSpell, type RewardItem, type RewardState } from '../state/gameState';
 
-const SAVE_KEY = 'manrpg-pwa-ai:save:v6';
-const LEGACY_SAVE_KEYS = ['manrpg-pwa-ai:save:v5', 'manrpg-pwa-ai:save:v4', 'manrpg-pwa-ai:save:v3', 'manrpg-pwa-ai:save:v2', 'manrpg-pwa-ai:save:v1'];
-const SAVE_VERSION = 6;
+const SAVE_KEY = 'manrpg-pwa-ai:save:v8';
+const LEGACY_SAVE_KEYS = [
+  'manrpg-pwa-ai:save:v7',
+  'manrpg-pwa-ai:save:v6',
+  'manrpg-pwa-ai:save:v5',
+  'manrpg-pwa-ai:save:v4',
+  'manrpg-pwa-ai:save:v3',
+  'manrpg-pwa-ai:save:v2',
+  'manrpg-pwa-ai:save:v1'
+];
+const SAVE_VERSION = 8;
 
 type SavePayload = {
   saveVersion: number;
@@ -12,6 +20,8 @@ type SavePayload = {
 
 const validPhases = ['player-main', 'player-reaction', 'enemy-main', 'enemy-reaction', 'floor-cleared', 'reward-pending', 'level-up-pending', 'battle-ended'];
 const validRewardTypes: RewardItem['type'][] = ['coin', 'martial', 'magicBook', 'multi', 'reset', 'trait', 'special', 'item'];
+const validActionTypes = ['move', 'basic-attack', 'skill', 'spell', 'item', 'defend', 'wait'];
+const validReactionTypes = ['dodge', 'guard', 'counter'];
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -110,6 +120,35 @@ const isValidRewardState = (value: unknown): value is RewardState => {
   );
 };
 
+const isValidQueuedAction = (value: unknown): boolean => {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.label === 'string' &&
+    validActionTypes.includes(value.type as string) &&
+    (value.direction === undefined || value.direction === 'up' || value.direction === 'down' || value.direction === 'left' || value.direction === 'right') &&
+    (value.steps === undefined || isNumber(value.steps)) &&
+    (value.spellId === undefined || typeof value.spellId === 'string') &&
+    (value.itemId === undefined || typeof value.itemId === 'string') &&
+    (value.reactionType === undefined || validReactionTypes.includes(value.reactionType as string))
+  );
+};
+
+const isValidPendingReaction = (value: unknown): boolean => {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    (value.against === 'player' || value.against === 'enemy') &&
+    typeof value.attackLog === 'string' &&
+    (value.damage === undefined || isNumber(value.damage))
+  );
+};
+
 const isValidGameState = (value: unknown): value is GameState => {
   if (!isObject(value)) {
     return false;
@@ -123,6 +162,7 @@ const isValidGameState = (value: unknown): value is GameState => {
     isValidCharacter(value.enemy, 'enemy') &&
     Array.isArray(value.log) &&
     Array.isArray(value.actionQueue) &&
+    value.actionQueue.every(isValidQueuedAction) &&
     typeof value.selectedAction === 'string' &&
     isNumber(value.turn) &&
     validPhases.includes(value.phase as string) &&
@@ -132,7 +172,8 @@ const isValidGameState = (value: unknown): value is GameState => {
     value.inventory.every(isValidRewardItem) &&
     Array.isArray(value.spells) &&
     value.spells.every(isValidLearnedSpell) &&
-    (value.rewardState === undefined || isValidRewardState(value.rewardState))
+    (value.rewardState === undefined || isValidRewardState(value.rewardState)) &&
+    (value.pendingReaction === undefined || isValidPendingReaction(value.pendingReaction))
   );
 };
 

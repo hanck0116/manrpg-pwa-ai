@@ -41,6 +41,9 @@ export type QueuedAction = {
   label: string;
   direction?: Direction;
   steps?: number;
+  spellId?: string;
+  itemId?: string;
+  reactionType?: 'dodge' | 'guard' | 'counter';
 };
 
 export type BattlePhase =
@@ -54,6 +57,12 @@ export type BattlePhase =
   | 'battle-ended';
 export type TurnOwner = 'player' | 'enemy';
 export type BattleResult = 'win' | 'lose';
+
+export type PendingReaction = {
+  against: 'player' | 'enemy';
+  attackLog: string;
+  damage?: number;
+};
 
 export type GameLogEntry = {
   turn: number;
@@ -105,6 +114,7 @@ export type GameState = {
   inventory: RewardItem[];
   spells: LearnedSpell[];
   battleResult?: BattleResult;
+  pendingReaction?: PendingReaction;
 };
 
 export const createCharacter = (

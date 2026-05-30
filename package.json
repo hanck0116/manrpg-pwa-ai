@@ -7,11 +7,12 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
     "worker:check": "tsc --noEmit -p tsconfig.worker.json"
   },
-  "dependencies": {},
   "devDependencies": {
     "typescript": "^5.9.3",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vitest": "^4.1.7"
   }
 }

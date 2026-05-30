@@ -1,13 +1,16 @@
 import { enqueueAction, removeQueuedAction } from '../game/actionQueue';
 import { clearFloorRecovery, enterNextFloor } from '../game/floor';
-import { sellInventoryItem, useInventoryItem } from '../game/inventory';
+import { getBattleUsableItems, sellInventoryItem, useInventoryItem } from '../game/inventory';
 import { applyFiveLevelPlus, canFinishLevelAllocation, finishLevelAllocation } from '../game/levelUp';
+import { resolvePlayerReaction } from '../game/reactionFlow';
 import { createRewardOffer, claimSelectedRewards, toggleRewardSelection } from '../game/rewardFlow';
 import { advanceTurn, createNewBattleFromPlayer } from '../game/turn';
 import { fixedMap } from '../map/fixedMap';
 import { getMinimapSummary } from '../map/minimap';
 import { getDirectionLabel } from '../game/movement';
 import { loadGameStub, saveGameStub } from '../storage/save';
+import { buyShopItem, canBuyShopItem, getShopItems } from '../rules/shop';
+import { describeSpell } from '../rules/spell';
 import {
   allocatableStatKeys,
   canDecreaseStat,
@@ -308,6 +311,34 @@ const renderInventorySummary = (state: GameState): string => {
   `;
 };
 
+const renderShopPanel = (state: GameState): string => {
+  const shopEnabled = ['floor-cleared', 'reward-pending', 'level-up-pending', 'battle-ended'].includes(state.phase);
+
+  if (!shopEnabled) {
+    return '';
+  }
+
+  return `
+    <section class="panel shop-panel">
+      <details>
+        <summary>Shop</summary>
+        <div class="shop-list">
+          ${getShopItems()
+            .map(
+              (item) => `
+                <div class="reward-row">
+                  <span>${item.name} / ${item.price} coin${item.grade ? ` / ${item.grade}` : ''}</span>
+                  <button type="button" data-buy-shop-item="${item.id}" ${canBuyShopItem(state, item.id) ? '' : 'disabled'}>Buy</button>
+                </div>
+              `
+            )
+            .join('')}
+        </div>
+      </details>
+    </section>
+  `;
+};
+
 const renderKnownSpells = (state: GameState): string => `
   <section class="panel spells-panel">
     <details>
@@ -315,11 +346,69 @@ const renderKnownSpells = (state: GameState): string => `
       ${
         state.spells.length === 0
           ? '<p class="muted">습득한 마법이 없습니다.</p>'
-          : `<ul>${state.spells.map((spell) => `<li>${spell.name} / ${spell.circle}서클 / ${spell.grade}</li>`).join('')}</ul>`
+          : `<ul class="inventory-list">${state.spells
+              .map((spell) => {
+                const description = describeSpell(spell.name, spell.circle);
+                const disabled = state.phase === 'player-main' && !state.setupMode && !state.levelUpPending ? '' : 'disabled';
+
+                return `
+                  <li>
+                    <span>${spell.name} / ${spell.circle} circle / ${spell.grade} / ${description.category} / MP ${description.manaCost} / power ${description.power}</span>
+                    <button type="button" data-add-spell="${spell.id}" ${disabled}>Queue cast</button>
+                  </li>
+                `;
+              })
+              .join('')}</ul>`
       }
     </details>
   </section>
 `;
+
+const renderBattleItems = (state: GameState): string => {
+  const items = getBattleUsableItems(state);
+  const disabled = state.phase === 'player-main' && !state.setupMode && !state.levelUpPending ? '' : 'disabled';
+
+  return `
+    <section class="panel battle-items-panel">
+      <details>
+        <summary>Battle Items</summary>
+        ${
+          items.length === 0
+            ? '<p class="muted">No source-defined battle-usable items are available yet.</p>'
+            : `<ul class="inventory-list">${items
+                .map(
+                  (item) => `
+                    <li>
+                      <span>${item.name}</span>
+                      <button type="button" data-add-battle-item="${item.id}" ${disabled}>Queue item</button>
+                    </li>
+                  `
+                )
+                .join('')}</ul>`
+        }
+      </details>
+    </section>
+  `;
+};
+
+const renderReactionPanel = (state: GameState): string => {
+  if (state.phase !== 'player-reaction') {
+    return '';
+  }
+
+  return `
+    <section class="panel reaction-panel">
+      <h2>Reaction</h2>
+      <p class="muted">${state.pendingReaction?.attackLog ?? 'Enemy attack pending.'}</p>
+      <div class="action-grid">
+        <button type="button" data-reaction="dodge">Dodge</button>
+        <button type="button" data-reaction="guard">Guard</button>
+        <button type="button" data-reaction="counter">Counter</button>
+        <button type="button" data-reaction="none">No reaction</button>
+      </div>
+    </section>
+  `;
+};
 
 const renderActionQueue = (state: GameState): string => `
   <section class="panel queue-panel">
@@ -409,8 +498,11 @@ const template = (state: GameState): string => `
 
     ${renderFloorClearPanel(state)}
     ${renderRewardPanel(state)}
+    ${renderShopPanel(state)}
     ${renderInventorySummary(state)}
     ${renderKnownSpells(state)}
+    ${renderBattleItems(state)}
+    ${renderReactionPanel(state)}
     ${renderActionQueue(state)}
     ${renderActionButtons(state)}
     ${renderAISettings()}
@@ -449,6 +541,15 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const rewardId = target.dataset.toggleReward;
     const useItemId = target.dataset.useItem;
     const sellItemId = target.dataset.sellItem;
+    const addSpellId = target.dataset.addSpell;
+    const addBattleItemId = target.dataset.addBattleItem;
+    const buyShopItemId = target.dataset.buyShopItem;
+    const reaction = target.dataset.reaction as 'dodge' | 'guard' | 'counter' | 'none' | undefined;
+
+    if (reaction) {
+      setState(resolvePlayerReaction(getState(), reaction));
+      return;
+    }
 
     if (statIncrease) {
       setState(increaseStat(getState(), statIncrease));
@@ -500,6 +601,11 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
       return;
     }
 
+    if (buyShopItemId) {
+      setState(buyShopItem(getState(), buyShopItemId));
+      return;
+    }
+
     if (target.dataset.claimRewards !== undefined) {
       setState(claimSelectedRewards(getState()));
       return;
@@ -522,6 +628,32 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
 
     if (target.dataset.addMove !== undefined) {
       setState(enqueueAction(getState(), createQueuedAction('move', getSelectedDirection(root), getSelectedSteps(root))));
+      return;
+    }
+
+    if (addSpellId) {
+      const spell = getState().spells.find((knownSpell) => knownSpell.id === addSpellId);
+      setState(
+        enqueueAction(getState(), {
+          id: createActionId(),
+          type: 'spell',
+          spellId: addSpellId,
+          label: `${spell?.name ?? 'Spell'} cast`
+        })
+      );
+      return;
+    }
+
+    if (addBattleItemId) {
+      const item = getState().inventory.find((inventoryItem) => inventoryItem.id === addBattleItemId);
+      setState(
+        enqueueAction(getState(), {
+          id: createActionId(),
+          type: 'item',
+          itemId: addBattleItemId,
+          label: `${item?.name ?? 'Item'} use`
+        })
+      );
       return;
     }
 

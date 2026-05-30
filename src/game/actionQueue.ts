@@ -1,17 +1,16 @@
+import { useBattleInventoryItem } from './inventory';
 import { moveCharacterSteps } from './movement';
 import { resolveBasicAttack } from '../rules/combat';
+import { resolveSpellCast } from '../rules/spellCombat';
 import { appendLog, type GameState, type QueuedAction } from '../state/gameState';
 
+const terminalPhases: GameState['phase'][] = ['battle-ended', 'floor-cleared', 'reward-pending', 'level-up-pending'];
+
 const isActionBlockedPhase = (state: GameState): boolean =>
-  state.phase === 'battle-ended' ||
-  state.phase === 'floor-cleared' ||
-  state.phase === 'reward-pending' ||
-  state.phase === 'level-up-pending' ||
-  state.player.hp <= 0 ||
-  state.enemy.hp <= 0;
+  terminalPhases.includes(state.phase) || state.player.hp <= 0 || state.enemy.hp <= 0;
 
 const withBattleEndedIfNeeded = (state: GameState): GameState => {
-  if (state.phase === 'battle-ended' || state.phase === 'floor-cleared' || state.phase === 'reward-pending' || state.phase === 'level-up-pending') {
+  if (terminalPhases.includes(state.phase)) {
     return state;
   }
 
@@ -24,7 +23,7 @@ const withBattleEndedIfNeeded = (state: GameState): GameState => {
         turnOwner: 'player',
         actionQueue: []
       },
-      '층 클리어: 적이 쓰러졌습니다. 정비 단계로 이동할 수 있습니다.'
+      'Floor cleared: enemy HP reached 0. Move to recovery/reward.'
     );
   }
 
@@ -37,7 +36,7 @@ const withBattleEndedIfNeeded = (state: GameState): GameState => {
         turnOwner: 'enemy',
         actionQueue: []
       },
-      '전투 종료: 플레이어 HP가 0이 되어 남은 행동 큐를 실행하지 않습니다.'
+      'Battle ended: player HP reached 0.'
     );
   }
 
@@ -46,23 +45,23 @@ const withBattleEndedIfNeeded = (state: GameState): GameState => {
 
 export const enqueueAction = (state: GameState, action: QueuedAction): GameState => {
   if (state.setupMode) {
-    return appendLog(state, '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.');
+    return appendLog(state, 'Finish character setup before adding battle actions.');
   }
 
-  if (state.levelUpPending || state.phase === 'battle-ended' || state.phase === 'floor-cleared' || state.phase === 'reward-pending' || state.phase === 'level-up-pending') {
-    return appendLog(state, '정비/보상/레벨업 단계에서는 전투 행동을 할 수 없습니다.');
+  if (state.levelUpPending || terminalPhases.includes(state.phase)) {
+    return appendLog(state, 'Battle actions cannot be added during recovery/reward/level-up/end phases.');
   }
 
   if (state.phase !== 'player-main') {
-    return appendLog(state, '플레이어 메인턴에서만 행동을 추가할 수 있습니다. 반응턴은 다음 단계에서 구현합니다.');
+    return appendLog(state, 'Actions can only be queued during the player main phase.');
   }
 
   if (state.player.hp <= 0) {
-    return appendLog(state, '플레이어가 쓰러진 상태라 행동을 추가할 수 없습니다.');
+    return appendLog(state, 'The player is down and cannot add actions.');
   }
 
   if (action.type === 'basic-attack' && state.enemy.hp <= 0) {
-    return appendLog(state, '적이 이미 쓰러져 기본 공격 행동을 추가할 수 없습니다.');
+    return appendLog(state, 'The enemy is already down.');
   }
 
   return appendLog(
@@ -71,7 +70,7 @@ export const enqueueAction = (state: GameState, action: QueuedAction): GameState
       actionQueue: [...state.actionQueue, action],
       selectedAction: action.label
     },
-    `행동 큐에 추가: ${action.label}`
+    `Queued action: ${action.label}`
   );
 };
 
@@ -84,6 +83,37 @@ export const clearActionQueue = (state: GameState): GameState => ({
   ...state,
   actionQueue: []
 });
+
+const executeSpellAction = (state: GameState, action: QueuedAction): GameState => {
+  if (!action.spellId) {
+    return appendLog(state, 'Cast failed: choose a known spell before queuing a spell action.');
+  }
+
+  const spell = state.spells.find((knownSpell) => knownSpell.id === action.spellId);
+
+  if (!spell) {
+    return appendLog(state, 'Cast failed: the selected spell is not known.');
+  }
+
+  const result = resolveSpellCast(state.player, state.enemy, spell);
+
+  return appendLog(
+    {
+      ...state,
+      player: result.caster.kind === 'player' ? result.caster : state.player,
+      enemy: result.target.kind === 'enemy' ? result.target : state.enemy
+    },
+    result.log
+  );
+};
+
+const executeItemAction = (state: GameState, action: QueuedAction): GameState => {
+  if (!action.itemId) {
+    return appendLog(state, 'Use item failed: choose an item before queuing an item action.');
+  }
+
+  return useBattleInventoryItem(state, action.itemId);
+};
 
 const executeQueuedAction = (state: GameState, action: QueuedAction): GameState => {
   if (isActionBlockedPhase(state)) {
@@ -117,22 +147,27 @@ const executeQueuedAction = (state: GameState, action: QueuedAction): GameState 
           ...baseState,
           player: { ...baseState.player, guarding: true }
         },
-        '플레이어가 방어 자세를 취했습니다.'
+        'Player takes a guard stance.'
       );
     case 'skill':
-      return appendLog(baseState, '스킬은 원본 규칙 확인 후 구현 예정입니다.');
+      return appendLog(baseState, 'Skill effects are TODO until the source rule is mapped.');
     case 'spell':
-      return appendLog(baseState, '마법은 원본 규칙 확인 후 구현 예정입니다.');
+      return executeSpellAction(baseState, action);
     case 'item':
-      return appendLog(baseState, '아이템은 저장/인벤토리 규칙 확인 후 구현 예정입니다.');
+      return executeItemAction(baseState, action);
     case 'wait':
-      return appendLog(baseState, '플레이어가 대기했습니다.');
+      return appendLog(baseState, 'Player waits.');
   }
 };
 
 export const executeActionQueue = (state: GameState): GameState => {
   if (state.setupMode || state.levelUpPending || state.phase !== 'player-main') {
-    return appendLog(state, state.setupMode ? '캐릭터 생성이 끝나야 전투 행동을 할 수 있습니다.' : '정비/보상/레벨업 단계에서는 전투 행동을 할 수 없습니다.');
+    return appendLog(
+      state,
+      state.setupMode
+        ? 'Finish character setup before executing battle actions.'
+        : 'Battle actions can only execute during the player main phase.'
+    );
   }
 
   let currentState = state;
@@ -140,7 +175,7 @@ export const executeActionQueue = (state: GameState): GameState => {
   for (const action of state.actionQueue) {
     currentState = withBattleEndedIfNeeded(currentState);
 
-    if (currentState.phase === 'battle-ended' || currentState.phase === 'floor-cleared' || currentState.phase === 'reward-pending' || currentState.phase === 'level-up-pending') {
+    if (terminalPhases.includes(currentState.phase)) {
       return currentState;
     }
 

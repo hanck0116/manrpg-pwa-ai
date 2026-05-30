@@ -134,10 +134,10 @@ npm run worker:check
   - 플레이어 위치와 적 위치를 초기 좌표로 되돌리고 적 1명만 재생성
   - 같은 7x7 고정 맵을 사용하며 보스몹/랜덤 맵/다중 적 생성 없음
   - 패배로 `battle-ended`가 된 경우에만 새 전투 시작 버튼으로 초기 적 1명을 재생성
-- 반응턴 구조 자리
-  - `player-reaction`, `enemy-reaction` phase 타입은 존재
-  - 실제 반응 행동은 다음 단계 TODO
-  - 반응은 턴을 소모하지 않는다는 원칙을 주석/TODO에 보존
+- 반응행동 1차
+  - 적 인접 공격 직전 `player-reaction` phase로 진입
+  - 회피/방어/카운터/반응 안 함 처리
+  - 반응은 턴과 행동 큐를 소모하지 않음
 - 미니맵 요약
   - 플레이어 기준 북/동/남/서 정보
   - 적 방향과 거리
@@ -145,10 +145,10 @@ npm run worker:check
   - 계단 미구현 표시
 - 전투 로그 최근 20개 표시
 - 저장/불러오기 stub
-  - `saveVersion: 6`
-  - `floor`, `rewardState`, `inventory`, `spells`, `levelUpPending`을 포함한 현재 구조만 유효 저장으로 취급
-  - saveVersion 5 이하 데이터 또는 깨진 저장 데이터는 초기 상태로 복구
-  - actionQueue 저장/복구
+  - `saveVersion: 8`
+  - `floor`, `rewardState`, `inventory`, `spells`, `levelUpPending`, `pendingReaction`을 포함한 현재 구조만 유효 저장으로 취급
+  - saveVersion 8이 아니거나 깨진 저장 데이터는 초기 상태로 복구
+  - actionQueue와 `spellId`/`itemId`/`reactionType` 저장/복구
 - 접이식 AI 설정 패널 자리
 - Cloudflare Worker stub
 - AI 라우터 및 provider stub
@@ -221,12 +221,10 @@ npm run worker:check
 
 - 일반 판정의 상황별 성공조건 정리
 - 심법, 심적초월, 불멸, 자기상환적 돌연변이 등 상태 필드가 더 필요한 파생 수치
-- 반응턴 실제 구현
 - 스킬 실제 효과 구현
-- 마법 전투 시전 구현
-- 전투 중 아이템 사용
 - 장비 구현
-- 상점 구현
+- 마법 특수 효과/상태이상 구현
+- 전투 중 실제 소모 아이템 추가
 - AI provider 실제 호출
 - Worker relay 구현
 - 테스트 코드 추가
@@ -263,3 +261,21 @@ npm run worker:check
 - 판매는 `sell` 값만큼 코인을 지급하고 아이템을 제거합니다. `sell=0`인 trait/special/item은 판매 불가입니다.
 - 스킬 초기화권, trait/special/item 계열 원본 효과, 마법 전투 시전, 전투 중 아이템 사용은 아직 TODO입니다.
 - 플레이어 1명, 적 1명, 보스 없음, 동일한 7x7 고정 맵, 파티/3인 구조 없음 원칙은 유지합니다.
+
+## 구현 완료: 전투 마법, 상점, 반응행동 1차, 테스트
+
+현재 코드도 플레이어 1명, 적 1명, 보스 없음, 파티/플레이어 선택 구조 없음, 동일한 7x7 고정 맵 원칙을 유지합니다.
+
+- 전투 마법 시전은 행동 큐의 `spellId`로 연결됩니다.
+- 보유 마법 패널에서 마법을 행동 큐에 추가할 수 있고, 서클/등급/범주/MP 소모/위력을 표시합니다.
+- 마법 범주, MP 소모, 위력 계산은 `src/rules/spell.ts`, 전투 해석은 `src/rules/spellCombat.ts`에서 처리합니다.
+- 전투 중 아이템 행동은 `itemId` 구조만 연결했습니다. 원본에 명확한 전투 소모품 효과가 없는 아이템은 효과를 만들지 않고 TODO 로그로 남깁니다.
+- 정비 단계 상점은 `src/rules/shop.ts`에 구현했으며 `floor-cleared`, `reward-pending`, `level-up-pending`, `battle-ended`에서만 사용할 수 있습니다.
+- 적의 인접 공격은 즉시 피해를 적용하지 않고 `player-reaction`으로 진입합니다. 회피/방어/카운터/반응 안 함은 행동 큐를 소모하지 않는 1차 구현입니다.
+- 저장 구조는 `saveVersion: 8`이며 `spellId`, `itemId`, `reactionType`, `pendingReaction`을 검증합니다.
+- Vitest 기반 `npm run test`를 추가했습니다.
+
+검증:
+
+- `npm run build`
+- `npm run test`

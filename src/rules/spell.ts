@@ -27,6 +27,36 @@ export type SpellResult = {
   message: string;
 };
 
+export type SpellCategory =
+  | 'single'
+  | 'singleHigh'
+  | 'smallArea'
+  | 'area'
+  | 'defense'
+  | 'heal'
+  | 'summon'
+  | 'utility'
+  | 'other';
+
+export type SpellDescription = {
+  category: SpellCategory;
+  rangeText: string;
+  manaCost: number;
+  power: number;
+};
+
+export const SPELL_MP: Record<SpellCircle, number> = {
+  1: 50,
+  2: 80,
+  3: 120,
+  4: 180,
+  5: 260,
+  6: 380,
+  7: 520,
+  8: 700,
+  9: 900
+};
+
 export const SPELLS: Record<SpellCircle, string[]> = {
   1: ['라이트', '파이어', '아이스', '윈드', '매직 애로우', '그리스', '디그', '다크니스'],
   2: ['샤이닝 에로우', '파이어 애로우', '아이스 애로우', '윈드 애로우', '록 애로우', '라이트닝 애로우', '쉴드', '힐', '아이스 포그', '다크 애로우'],
@@ -109,6 +139,92 @@ export const tryLearnMagicBook = (wisdom: number, grade: string): TryLearnMagicB
     difficulty,
     keepBookOnFail: true,
     message: `마법서 습득 실패: 1d${difficulty}=${roll}, 지혜 ${safeWisdom}. 마법서는 사라지지 않습니다.`
+  };
+};
+
+export const spellCategory = (name: string): SpellCategory => {
+  const normalized = name.toLowerCase();
+
+  if (/(heal|cure|recovery|restore|힐|치유|회복)/i.test(name)) return 'heal';
+  if (/(barrier|shield|guard|armor|protection|방어|보호|배리어)/i.test(name)) return 'defense';
+  if (/(summon|golem|dragon|소환)/i.test(name)) return 'summon';
+  if (/(teleport|control|silence|blind|slow|haste|gravity|bind|utility|이동|제어)/i.test(name)) return 'utility';
+  if (/(storm|rain|field|wave|inferno|meteor|mass|area|nova|quake|전체|광역)/i.test(name)) return 'area';
+  if (/(arrow|bolt|spark|chain|cannon|beam|single|화살|탄환)/i.test(name)) return 'singleHigh';
+  if (/(ball|burst|flare|circle|cone|small|범위)/i.test(name) || normalized.includes('aoe')) return 'smallArea';
+
+  return 'single';
+};
+
+export const spellRangeText = (category: SpellCategory): string => {
+  switch (category) {
+    case 'singleHigh':
+    case 'single':
+      return 'single target';
+    case 'smallArea':
+      return 'small area, resolved against the one current enemy';
+    case 'area':
+      return 'area, resolved against the one current enemy';
+    case 'defense':
+      return 'self defense';
+    case 'heal':
+      return 'self heal';
+    case 'summon':
+      return 'summon impact, resolved against the one current enemy';
+    case 'utility':
+      return 'utility impact, resolved against the one current enemy';
+    case 'other':
+      return 'other';
+  }
+};
+
+export const spellPowerRatio = (circle: number, category: SpellCategory): number => {
+  const base = Math.min(1, (circle + 0.2) / 6);
+  const categoryMultiplier: Record<SpellCategory, number> = {
+    singleHigh: 1,
+    single: 0.86,
+    smallArea: 0.68,
+    area: 0.45,
+    defense: 0.8,
+    heal: 0.72,
+    summon: 0.6,
+    utility: 0.35,
+    other: 0.7
+  };
+
+  return Math.min(1, base * categoryMultiplier[category]);
+};
+
+export const spellPower = (mp: number, circle: number, category: SpellCategory): number =>
+  Math.min(mp, Math.max(1, Math.floor(mp * spellPowerRatio(circle, category))));
+
+export const spellManaCost = (circle: number, category: SpellCategory): number => {
+  const safeCircle = Math.min(9, Math.max(1, Math.floor(circle))) as SpellCircle;
+  const base = SPELL_MP[safeCircle];
+  const categoryCostMultiplier: Record<SpellCategory, number> = {
+    singleHigh: 1,
+    single: 0.95,
+    smallArea: 1.05,
+    area: 1.15,
+    defense: 0.95,
+    heal: 1,
+    summon: 1.15,
+    utility: 0.8,
+    other: 1
+  };
+
+  return Math.max(1, Math.round(base * categoryCostMultiplier[category]));
+};
+
+export const describeSpell = (name: string, circle: number): SpellDescription => {
+  const category = spellCategory(name);
+  const manaCost = spellManaCost(circle, category);
+
+  return {
+    category,
+    rangeText: spellRangeText(category),
+    manaCost,
+    power: spellPower(manaCost, circle, category)
   };
 };
 

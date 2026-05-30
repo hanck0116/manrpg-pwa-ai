@@ -1,4 +1,5 @@
 import { moveCharacterStep } from './movement';
+import { beginPlayerReaction } from './reactionFlow';
 import { isAdjacent, resolveBasicAttack } from '../rules/combat';
 import { appendLog, type Direction, type GameState } from '../state/gameState';
 
@@ -18,7 +19,13 @@ export const runEnemyMainTurn = (state: GameState): GameState => {
     return state;
   }
 
-  if (state.phase === 'battle-ended' || state.phase === 'floor-cleared' || state.phase === 'reward-pending' || state.enemy.hp <= 0 || state.player.hp <= 0) {
+  if (
+    state.phase === 'battle-ended' ||
+    state.phase === 'floor-cleared' ||
+    state.phase === 'reward-pending' ||
+    state.enemy.hp <= 0 ||
+    state.player.hp <= 0
+  ) {
     return state;
   }
 
@@ -31,13 +38,7 @@ export const runEnemyMainTurn = (state: GameState): GameState => {
   if (isAdjacent(baseState.enemy, baseState.player)) {
     const result = resolveBasicAttack(baseState.enemy, baseState.player);
 
-    return appendLog(
-      {
-        ...baseState,
-        player: { ...baseState.player, hp: result.targetHp }
-      },
-      `적 행동: ${result.log}`
-    );
+    return beginPlayerReaction(baseState, `Enemy action: ${result.log}`, result.damage);
   }
 
   const direction = chooseDirectionTowardPlayer(baseState);
@@ -47,8 +48,8 @@ export const runEnemyMainTurn = (state: GameState): GameState => {
     movedState.enemy.position.x === baseState.enemy.position.x &&
     movedState.enemy.position.y === baseState.enemy.position.y
   ) {
-    return appendLog(movedState, '적 행동: 이동 경로가 막혀 대기했습니다.');
+    return appendLog(movedState, 'Enemy action: movement path is blocked, so the enemy waits.');
   }
 
-  return appendLog(movedState, '적 행동: 플레이어 방향으로 접근했습니다.');
+  return appendLog(movedState, 'Enemy action: moved toward the player.');
 };

@@ -1,5 +1,6 @@
 import { executeActionQueue } from './actionQueue';
 import { runEnemyMainTurn } from './enemyAI';
+import { resolvePlayerReaction } from './reactionFlow';
 import { appendLog, createInitialEnemy, type Character, type GameState } from '../state/gameState';
 
 const withBattleEndIfNeeded = (state: GameState): GameState => {
@@ -106,7 +107,8 @@ const runAutomaticEnemyTurn = (state: GameState): GameState => {
     endedAfterEnemyAction.phase === 'battle-ended' ||
     endedAfterEnemyAction.phase === 'floor-cleared' ||
     endedAfterEnemyAction.phase === 'reward-pending' ||
-    endedAfterEnemyAction.phase === 'level-up-pending'
+    endedAfterEnemyAction.phase === 'level-up-pending' ||
+    endedAfterEnemyAction.phase === 'player-reaction'
   ) {
     return endedAfterEnemyAction;
   }
@@ -179,7 +181,8 @@ export const finishEnemyMainTurn = (state: GameState): GameState => {
     endedAfterEnemyAction.phase === 'battle-ended' ||
     endedAfterEnemyAction.phase === 'floor-cleared' ||
     endedAfterEnemyAction.phase === 'reward-pending' ||
-    endedAfterEnemyAction.phase === 'level-up-pending'
+    endedAfterEnemyAction.phase === 'level-up-pending' ||
+    endedAfterEnemyAction.phase === 'player-reaction'
   ) {
     return endedAfterEnemyAction;
   }
@@ -205,6 +208,7 @@ export const advanceTurn = (state: GameState): GameState => {
     case 'enemy-main':
       return finishEnemyMainTurn(state);
     case 'player-reaction':
+      return resolvePlayerReaction(state, 'none');
     case 'enemy-reaction':
       // TODO: 반응은 턴을 소모하지 않는다는 원칙으로 다음 단계에서 실제 구현합니다.
       return appendLog(state, '반응턴은 다음 단계에서 구현합니다. 반응은 턴을 소모하지 않습니다.');
