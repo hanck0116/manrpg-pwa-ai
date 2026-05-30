@@ -233,7 +233,7 @@ export const spellRangeText = (category: SpellCategory): string => {
     case 'single':
       return '단일';
     case 'smallArea':
-      return '좁은 범위';
+      return '소범위';
     case 'area':
       return '광역';
     case 'defense':

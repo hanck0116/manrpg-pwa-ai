@@ -58,6 +58,11 @@ export const makeItem = (name: string): RewardItem => {
   if (name === '중급 마법서') return withRewardId({ name: '중급 마법서', type: 'magicBook', grade: '중급', sell: 5 }, 'magic');
   if (name === '고급 마법서') return withRewardId({ name: '고급 마법서', type: 'magicBook', grade: '고급', sell: 8 }, 'magic');
   if (name === '마도서') return withRewardId({ name: '마도서', type: 'magicBook', grade: '마도서', sell: 15 }, 'magic');
+  if (name === '기초 마법서 뽑기권') return withRewardId({ name, type: 'magicTicket', grade: '기초', mode: 'random', sell: 3 }, 'magic-ticket');
+  if (name === '중급 마법서 뽑기권') return withRewardId({ name, type: 'magicTicket', grade: '중급', mode: 'random', sell: 5 }, 'magic-ticket');
+  if (name === '고급 마법서 뽑기권') return withRewardId({ name, type: 'magicTicket', grade: '고급', mode: 'random', sell: 8 }, 'magic-ticket');
+  if (name === '기초 마법서 선택권') return withRewardId({ name, type: 'magicTicket', grade: '기초', mode: 'select', sell: 5 }, 'magic-ticket');
+  if (name === '중급 마법서 선택권') return withRewardId({ name, type: 'magicTicket', grade: '중급', mode: 'select', sell: 8 }, 'magic-ticket');
 
   const traitNames = [
     '모델링',
@@ -91,6 +96,7 @@ export const makeItem = (name: string): RewardItem => {
 
   if (traitNames.includes(name)) return withRewardId({ name, type: 'trait', sell: 0 }, 'trait');
   if (name === '공법' || name === '오리지널 스킬' || name === '무공') return withRewardId({ name, type: 'special', sell: 0 }, 'special');
+  if (name.includes('선택권')) return withRewardId({ name, type: 'choice', sell: 0 }, 'choice');
 
   return withRewardId({ name, type: 'item', sell: 0 }, 'item');
 };

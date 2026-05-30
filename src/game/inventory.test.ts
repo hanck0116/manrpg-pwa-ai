@@ -23,8 +23,8 @@ const withCoin = (state: GameState, coin: number): GameState => ({
   }
 });
 
-describe('인벤토리와 상점', () => {
-  it('외공서 사용 시 outerStack이 1 증가합니다', () => {
+describe('inventory and shop', () => {
+  it('increases outerStack when using an outer manual', () => {
     const item = makeItem('외공서');
     const state = {
       ...maintenanceState(),
@@ -37,7 +37,7 @@ describe('인벤토리와 상점', () => {
     expect(next.inventory).toHaveLength(0);
   });
 
-  it('검기 사용 시 swordKi는 최대 6을 넘지 않습니다', () => {
+  it('caps swordKi at 6 when using sword manuals', () => {
     const item = makeItem('검기');
     const base = maintenanceState();
     const state = {
@@ -58,7 +58,7 @@ describe('인벤토리와 상점', () => {
     expect(next.inventory).toHaveLength(1);
   });
 
-  it('마법서 습득 실패 시 인벤토리를 유지합니다', () => {
+  it('keeps a magic book in inventory when learning fails', () => {
     const item = makeItem('기초 마법서');
     const base = maintenanceState();
     const state = {
@@ -79,7 +79,7 @@ describe('인벤토리와 상점', () => {
     expect(next.spells).toHaveLength(0);
   });
 
-  it('상점 구매 시 한국어 원본명 아이템을 인벤토리에 추가합니다', () => {
+  it('adds a Korean source-name item when buying from the shop', () => {
     const next = buyShopItem(withCoin(maintenanceState(), 10), 'magic-basic');
 
     expect(next.player.stats.coin).toBe(7);
@@ -91,25 +91,27 @@ describe('인벤토리와 상점', () => {
     });
   });
 
-  it('마법서 뽑기권은 바로 학습 가능한 마법서로 만들지 않습니다', () => {
+  it('adds a magicTicket, not a magicBook, when buying a draw ticket', () => {
     const next = buyShopItem(withCoin(maintenanceState(), 20), 'magic-draw-ticket');
 
     expect(next.player.stats.coin).toBe(5);
     expect(next.inventory[0]).toMatchObject({
-      name: '마법서 뽑기권',
-      type: 'item',
-      sell: 0
+      name: '기초 마법서 뽑기권',
+      type: 'magicTicket',
+      grade: '기초',
+      mode: 'random',
+      sell: 3
     });
   });
 
-  it('코인이 부족하면 구매할 수 없습니다', () => {
+  it('does not buy when coin is insufficient', () => {
     const next = buyShopItem(withCoin(maintenanceState(), 2), 'magic-basic');
 
     expect(next.player.stats.coin).toBe(2);
     expect(next.inventory).toHaveLength(0);
   });
 
-  it('정비 단계가 아니면 구매할 수 없습니다', () => {
+  it('does not buy outside maintenance phases', () => {
     const state = {
       ...withCoin(maintenanceState(), 10),
       phase: 'player-main' as const
@@ -119,10 +121,51 @@ describe('인벤토리와 상점', () => {
     expect(next.player.stats.coin).toBe(10);
     expect(next.inventory).toHaveLength(0);
   });
+
+  it('uses random magicTicket to add one spell and remove the ticket', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const item = makeItem('기초 마법서 뽑기권');
+    const state = {
+      ...maintenanceState(),
+      inventory: [item]
+    };
+
+    const next = useInventoryItem(state, item.id);
+
+    expect(next.spells).toHaveLength(1);
+    expect(next.spells[0]).toMatchObject({ name: '라이트', circle: 1, grade: '기초' });
+    expect(next.inventory).toHaveLength(0);
+    vi.restoreAllMocks();
+  });
+
+  it('keeps select magicTicket until selection UI exists', () => {
+    const item = makeItem('기초 마법서 선택권');
+    const state = {
+      ...maintenanceState(),
+      inventory: [item]
+    };
+
+    const next = useInventoryItem(state, item.id);
+
+    expect(next.spells).toHaveLength(0);
+    expect(next.inventory).toHaveLength(1);
+  });
+
+  it('keeps choice item until choice UI exists', () => {
+    const item = makeItem('아무 선택권');
+    const state = {
+      ...maintenanceState(),
+      inventory: [item]
+    };
+
+    const next = useInventoryItem(state, item.id);
+
+    expect(next.inventory).toHaveLength(1);
+  });
 });
 
-describe('saveVersion 8', () => {
-  it('최신 행동 큐 필드를 저장하고 복구합니다', () => {
+describe('saveVersion 9', () => {
+  it('round-trips latest reward item types and queued action fields', () => {
     const storage = new Map<string, string>();
     const localStorageStub = {
       getItem: vi.fn((key: string) => storage.get(key) ?? null),
@@ -143,6 +186,18 @@ describe('saveVersion 8', () => {
     const state = {
       ...maintenanceState(),
       actionQueue: [action],
+      inventory: [
+        makeItem('기초 마법서 뽑기권'),
+        makeItem('아무 선택권'),
+        {
+          id: 'multi-item-1',
+          name: '묶음 보상',
+          type: 'multiItem' as const,
+          itemName: '외공서',
+          count: 2,
+          sell: 0
+        }
+      ],
       pendingReaction: {
         against: 'player' as const,
         attackLog: '공격 대기',
@@ -150,8 +205,9 @@ describe('saveVersion 8', () => {
       }
     };
 
-    expect(saveGameStub(state)).toContain('saveVersion 8');
+    expect(saveGameStub(state)).toContain('saveVersion 9');
     expect(loadGameStub().actionQueue[0]).toMatchObject(action);
+    expect(loadGameStub().inventory.map((item) => item.type)).toEqual(['magicTicket', 'choice', 'multiItem']);
     expect(loadGameStub().pendingReaction).toMatchObject({ against: 'player', damage: 1 });
 
     vi.unstubAllGlobals();

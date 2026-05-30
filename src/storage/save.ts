@@ -1,8 +1,9 @@
 import { calcDerivedStats } from '../rules/derivedStats';
 import { createInitialGameState, type Character, type CoreStats, type GameState, type LearnedSpell, type RewardItem, type RewardState } from '../state/gameState';
 
-const SAVE_KEY = 'manrpg-pwa-ai:save:v8';
+const SAVE_KEY = 'manrpg-pwa-ai:save:v9';
 const LEGACY_SAVE_KEYS = [
+  'manrpg-pwa-ai:save:v8',
   'manrpg-pwa-ai:save:v7',
   'manrpg-pwa-ai:save:v6',
   'manrpg-pwa-ai:save:v5',
@@ -11,7 +12,7 @@ const LEGACY_SAVE_KEYS = [
   'manrpg-pwa-ai:save:v2',
   'manrpg-pwa-ai:save:v1'
 ];
-const SAVE_VERSION = 8;
+const SAVE_VERSION = 9;
 
 type SavePayload = {
   saveVersion: number;
@@ -19,7 +20,7 @@ type SavePayload = {
 };
 
 const validPhases = ['player-main', 'player-reaction', 'enemy-main', 'enemy-reaction', 'floor-cleared', 'reward-pending', 'level-up-pending', 'battle-ended'];
-const validRewardTypes: RewardItem['type'][] = ['coin', 'martial', 'magicBook', 'multi', 'reset', 'trait', 'special', 'item'];
+const validRewardTypes: RewardItem['type'][] = ['coin', 'martial', 'magicBook', 'magicTicket', 'choice', 'multiItem', 'multi', 'reset', 'trait', 'special', 'item'];
 const validActionTypes = ['move', 'basic-attack', 'skill', 'spell', 'item', 'defend', 'wait'];
 const validReactionTypes = ['dodge', 'guard', 'counter'];
 
@@ -86,7 +87,10 @@ const isValidRewardItem = (value: unknown): value is RewardItem => {
     (value.sell === undefined || isNumber(value.sell)) &&
     (value.mode === undefined || value.mode === 'random' || value.mode === 'select') &&
     (value.learnedSpellName === undefined || typeof value.learnedSpellName === 'string') &&
-    (value.learnedCircle === undefined || isNumber(value.learnedCircle))
+    (value.learnedCircle === undefined || isNumber(value.learnedCircle)) &&
+    (value.choices === undefined || (Array.isArray(value.choices) && value.choices.every((choice) => typeof choice === 'string'))) &&
+    (value.itemName === undefined || typeof value.itemName === 'string') &&
+    (value.count === undefined || isNumber(value.count))
   );
 };
 
@@ -196,7 +200,7 @@ export const saveGameStub = (state: GameState): string => {
 
   localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
 
-  return `저장 stub: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리, 보유 마법을 localStorage에 기록했습니다.`;
+  return `저장: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리, 보유 마법을 localStorage에 기록했습니다.`;
 };
 
 export const loadGameStub = (): GameState => {

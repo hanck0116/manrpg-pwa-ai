@@ -1,4 +1,4 @@
-import { tryLearnMagicBook } from '../rules/spell';
+import { rollSpellFromGrade, tryLearnMagicBook } from '../rules/spell';
 import { appendLog, type GameState, type LearnedSpell, type RewardItem } from '../state/gameState';
 import { refreshPlayer, updatePlayerStats } from './characterUpdate';
 
@@ -93,6 +93,33 @@ export const useInventoryItem = (state: GameState, itemId: string): GameState =>
     );
   }
 
+  if (item.type === 'magicTicket') {
+    if (item.mode === 'select') {
+      return appendLog(state, '마법서 선택권은 선택 UI 구현 후 사용할 수 있습니다.');
+    }
+
+    const spell = rollSpellFromGrade(item.grade ?? '기초');
+    const learnedSpell: LearnedSpell = {
+      id: createId('spell'),
+      name: spell.name,
+      circle: spell.circle,
+      grade: spell.grade,
+      sourceItemName: item.name
+    };
+
+    return appendLog(
+      {
+        ...removeItemWithoutLog(state, itemId),
+        spells: [...state.spells, learnedSpell]
+      },
+      `${item.name} 사용: ${spell.name} ${spell.circle}서클 마법을 획득했습니다.`
+    );
+  }
+
+  if (item.type === 'choice') {
+    return appendLog(state, `${item.name}은 선택지 UI 구현 후 사용할 수 있습니다.`);
+  }
+
   if (item.type === 'reset') {
     return appendLog(state, '스킬 시스템 구현 후 사용할 수 있습니다.');
   }
@@ -116,8 +143,8 @@ export const useBattleInventoryItem = (state: GameState, itemId: string): GameSt
     return appendLog(state, '아이템 사용 실패: 선택한 아이템을 인벤토리에서 찾을 수 없습니다.');
   }
 
-  if (item.name === '마법서 뽑기권') {
-    return appendLog(state, '마법서 뽑기권 효과는 다음 단계에서 구현 예정입니다.');
+  if (item.type === 'magicTicket') {
+    return appendLog(state, '마법서 뽑기권은 정비 단계에서 사용할 수 있습니다.');
   }
 
   if (!canUseItemInBattle(item)) {

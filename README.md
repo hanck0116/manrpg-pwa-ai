@@ -144,10 +144,10 @@ npm run worker:check
   - 근접 위협 표시
   - 계단 미구현 표시
 - 전투 로그 최근 20개 표시
-- 저장/불러오기 stub
-  - `saveVersion: 8`
+- 저장/불러오기
+  - `saveVersion: 9`
   - `floor`, `rewardState`, `inventory`, `spells`, `levelUpPending`, `pendingReaction`을 포함한 현재 구조만 유효 저장으로 취급
-  - saveVersion 8이 아니거나 깨진 저장 데이터는 초기 상태로 복구
+  - saveVersion 9가 아니거나 깨진 저장 데이터는 초기 상태로 복구
   - actionQueue와 `spellId`/`itemId`/`reactionType` 저장/복구
 - 접이식 AI 설정 패널 자리
 - Cloudflare Worker stub
@@ -271,10 +271,12 @@ npm run worker:check
 - 마법 범주는 원본 마법명 목록 기반으로 분류하며, MP 소모/위력 계산은 `src/rules/spell.ts`, 전투 해석은 `src/rules/spellCombat.ts`에서 처리합니다.
 - 전투 중 아이템 행동은 `itemId` 구조만 연결했습니다. 원본에 명확한 전투 소모품 효과가 없는 아이템은 효과를 만들지 않고 TODO 로그로 남깁니다.
 - 정비 단계 상점은 `src/rules/shop.ts`에 구현했으며 `floor-cleared`, `reward-pending`, `level-up-pending`, `battle-ended`에서만 사용할 수 있습니다.
-- 상점 상품명은 원본 한국어명으로 표시/생성합니다: 기초/중급/고급 마법서, 멀티캐스팅의 서, 외공서, 내공서, 검기, 마법서 뽑기권, 스킬 초기화권.
+- 상점 상품명은 원본 한국어명으로 표시/생성합니다: 기초/중급/고급 마법서, 멀티캐스팅의 서, 외공서, 내공서, 검기, 기초 마법서 뽑기권, 스킬 초기화권.
+- `RewardItem.type`은 원본 `makeItem()` 확장을 위해 `magicTicket`, `choice`, `multiItem`을 포함합니다.
+- `magicBook`은 지혜 판정으로 습득하고 실패 시 유지됩니다. `magicTicket` random은 판정 없이 등급 범위 마법 1개를 지급하고 사용한 권을 제거합니다. `magicTicket` select와 `choice`는 선택 UI 구현 전까지 사용하지 않고 유지합니다.
 - 적의 인접 공격은 즉시 피해를 적용하지 않고 `player-reaction`으로 진입합니다. 회피/방어/카운터/반응 안 함은 행동 큐를 소모하지 않는 1차 구현입니다.
 - 플레이어의 방어 행동은 적의 다음 공격 1회 판정까지 유지되고, 공격/반응 처리 후 해제됩니다.
-- 저장 구조는 `saveVersion: 8`이며 `spellId`, `itemId`, `reactionType`, `pendingReaction`을 검증합니다.
+- 저장 구조는 `saveVersion: 9`이며 `spellId`, `itemId`, `reactionType`, `pendingReaction`, `magicTicket`, `choice`, `multiItem`을 검증합니다.
 - Vitest 기반 `npm run test`를 추가했습니다.
 
 검증:

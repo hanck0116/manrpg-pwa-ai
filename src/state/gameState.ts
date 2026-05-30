@@ -72,13 +72,16 @@ export type GameLogEntry = {
 export type RewardItem = {
   id: string;
   name: string;
-  type: 'coin' | 'martial' | 'magicBook' | 'multi' | 'reset' | 'trait' | 'special' | 'item';
+  type: 'coin' | 'martial' | 'magicBook' | 'magicTicket' | 'choice' | 'multiItem' | 'multi' | 'reset' | 'trait' | 'special' | 'item';
   coin?: number;
   grade?: string;
   sell?: number;
   mode?: 'random' | 'select';
   learnedSpellName?: string;
   learnedCircle?: number;
+  choices?: string[];
+  itemName?: string;
+  count?: number;
 };
 
 export type LearnedSpell = {

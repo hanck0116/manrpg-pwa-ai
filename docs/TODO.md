@@ -38,6 +38,9 @@
 - [x] 상점 상품명 원본 한국어명 정리
 - [x] 마법 분류 원본 목록 기반 정리
 - [x] 방어 행동 유지/해제 버그 수정
+- [x] RewardItem 타입 원본 makeItem 기준 확장
+- [x] magicTicket random 사용 1차 구현
+- [x] saveVersion 9 반영
 
 ## 남은 TODO
 
@@ -45,6 +48,8 @@
 - [ ] 스킬 실제 효과 구현
 - [ ] 장비 구현
 - [ ] 스킬 초기화권 실제 효과 구현
+- [ ] magicTicket select 선택 UI
+- [ ] choice 선택권 UI
 - [ ] 마법 특수 효과/상태이상 구현
 - [ ] 전투 중 실제 소모 아이템 추가
 - [ ] AI provider 실제 호출

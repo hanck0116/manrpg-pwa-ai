@@ -11,8 +11,6 @@ export type ShopItem = {
   description: string;
 };
 
-const createId = (prefix: string): string => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
 export const SHOP_BUY_LIST: ShopItem[] = [
   { id: 'magic-basic', name: '기초 마법서', type: 'magicBook', price: 3, grade: '기초', description: '1~2서클 마법 습득 판정을 진행합니다.' },
   { id: 'magic-mid', name: '중급 마법서', type: 'magicBook', price: 9, grade: '중급', description: '3~4서클 마법 습득 판정을 진행합니다.' },
@@ -21,7 +19,7 @@ export const SHOP_BUY_LIST: ShopItem[] = [
   { id: 'outer-book', name: '외공서', type: 'martial', price: 10, description: '정비 단계에서 사용하면 외공이 1 증가합니다.' },
   { id: 'inner-book', name: '내공서', type: 'martial', price: 10, description: '정비 단계에서 사용하면 내공이 1 증가합니다.' },
   { id: 'sword-ki', name: '검기', type: 'martial', price: 30, description: '정비 단계에서 사용하면 검기가 1 증가합니다. 최대 6단계입니다.' },
-  { id: 'magic-draw-ticket', name: '마법서 뽑기권', type: 'item', price: 15, description: '마법서 뽑기권 효과는 다음 단계에서 구현 예정입니다.' },
+  { id: 'magic-draw-ticket', name: '기초 마법서 뽑기권', type: 'magicTicket', price: 15, grade: '기초', description: '사용하면 기초 등급 범위의 마법 1개를 즉시 획득합니다.' },
   { id: 'skill-reset', name: '스킬 초기화권', type: 'reset', price: 10, description: '스킬 초기화 효과는 다음 단계에서 구현 예정입니다.' }
 ];
 
@@ -36,15 +34,6 @@ export const canBuyShopItem = (state: GameState, shopItemId: string): boolean =>
 };
 
 const toRewardItem = (shopItem: ShopItem): RewardItem => {
-  if (shopItem.id === 'magic-draw-ticket') {
-    return {
-      id: createId('shop-magic-draw-ticket'),
-      name: '마법서 뽑기권',
-      type: 'item',
-      sell: 0
-    };
-  }
-
   return makeItem(shopItem.name);
 };
 
@@ -75,7 +64,7 @@ export const buyShopItem = (state: GameState, shopItemId: string): GameState => 
     inventory: [...state.inventory, toRewardItem(shopItem)]
   });
 
-  const todoNote = shopItem.id === 'magic-draw-ticket' || shopItem.id === 'skill-reset' ? ` ${shopItem.description}` : '';
+  const todoNote = shopItem.id === 'skill-reset' ? ` ${shopItem.description}` : '';
 
   return appendLog(updated, `${shopItem.name} 구매: ${shopItem.price}코인을 사용했습니다.${todoNote}`);
 };

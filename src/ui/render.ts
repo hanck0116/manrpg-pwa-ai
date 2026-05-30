@@ -467,8 +467,8 @@ const renderActionButtons = (state: GameState): string => {
       <button type="button" data-new-battle ${newBattleDisabled}>새 전투 시작</button>
       ${state.phase === 'enemy-main' ? '<p class="muted">적 메인턴은 자동 진행 대상입니다. 초기 선턴 등 예외 상황에서만 턴 마무리로 처리합니다.</p>' : ''}
       <div class="save-grid">
-        <button type="button" data-save="save">저장 stub</button>
-        <button type="button" data-save="load">불러오기 stub</button>
+        <button type="button" data-save="save">저장</button>
+        <button type="button" data-save="load">불러오기</button>
       </div>
     </section>
   `;
@@ -477,9 +477,9 @@ const renderActionButtons = (state: GameState): string => {
 const template = (state: GameState): string => `
   <main class="app-shell">
     <header class="hero">
-      <p class="eyebrow">Local-first PWA scaffold</p>
+      <p class="eyebrow">ManRPG 모바일 전투 시트</p>
       <h1>ManRPG PWA AI</h1>
-      <p>규칙·판정·전투·보상·미니맵은 로컬 TypeScript에서 처리하고, AI는 서술 보조 stub으로만 유지합니다.</p>
+      <p>플레이어 1명과 적 1명이 고정 7x7 맵에서 전투하고, 규칙·판정·보상은 로컬에서 처리합니다.</p>
     </header>
 
     ${renderTurnStatus(state)}
@@ -685,7 +685,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     }
 
     if (saveAction === 'load') {
-      setState(appendLog(loadGameStub(), '불러오기 stub: localStorage에서 검증된 상태를 읽었습니다. 깨진 데이터면 초기 상태로 복구됩니다.'));
+      setState(appendLog(loadGameStub(), '불러오기: localStorage에서 검증된 상태를 읽었습니다. 깨진 데이터면 초기 상태로 복구됩니다.'));
     }
   });
 };

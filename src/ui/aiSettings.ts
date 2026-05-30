@@ -1,6 +1,6 @@
 export const renderAISettings = (): string => `
   <details class="panel ai-settings">
-    <summary>AI 설정 (자리만 준비됨)</summary>
+    <summary>AI 설정</summary>
     <div class="setting-grid">
       <label>
         Provider 우선순위
