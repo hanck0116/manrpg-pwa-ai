@@ -2,13 +2,16 @@
 
 ManRPG를 **실행 가능한 PWA 기본 골격 + 로컬 규칙 엔진 + 고정 7x7 맵 + 1인 전투 루프**로 구성하는 진행 중 구현입니다.
 
-현재 단계의 목표는 “인벤토리에 들어간 보상 아이템의 사용 효과를 원본 규칙 기준으로 구현한다”입니다.
+현재 단계의 목표는 “AI API 실제 호출 1차 구현: AI는 규칙 판단에 참여하지 않고 GM 묘사/행동 해석/요약/설명 보조에만 사용한다”입니다.
 
 - Vite + TypeScript 기반
 - API 키 없이도 화면 표시
 - 규칙·판정·전투·보상·미니맵은 로컬 JS/TS에서 처리
-- AI는 GM 묘사, 애매한 행동 해석, 희소한 스킬/마법 설명 생성에만 사용 예정
-- 현재 AI 호출은 실제 API를 호출하지 않고 fallback/stub만 반환
+- AI는 GM 묘사, 자연어 행동 해석, 요약, 희소한 스킬/마법 설명 보조에만 사용
+- AI 응답은 로컬 규칙 결과를 덮어쓸 수 없으며 HP/MP/피해/보상 등 판정은 모두 로컬 TS 코드가 처리
+- 브라우저 직접 BYOK 방식으로 Groq/Gemini/OpenRouter를 호출할 수 있음
+- API 키는 기본적으로 메모리에만 보관하며, 사용자가 “이 기기에 API 키 저장”을 체크한 경우에만 localStorage에 저장
+- 브라우저 localStorage 키 저장은 개인 테스트용 편의 기능이며 안전한 비밀 저장소가 아님
 - 플레이어는 항상 1명
 - 적은 항상 1명
 - 보스몹 없음
@@ -225,13 +228,12 @@ npm run worker:check
 - 장비 구현
 - 마법 특수 효과/상태이상 구현
 - 전투 중 실제 소모 아이템 추가
-- AI provider 실제 호출
 - Worker relay 구현
 - 테스트 코드 추가
 
-## AI 라우터 1차 구현
+## AI API 1차 구현
 
-`callLLM(task, payload)`는 실제 API 호출 없이 아래 fallback 응답만 반환합니다.
+`callLLM(task, payload)`는 AI 설정이 꺼져 있거나 사용 가능한 키/provider가 없거나 모든 provider 호출이 실패하면 아래 fallback 응답을 반환합니다. 실패해도 게임 진행은 중단되지 않습니다.
 
 ```json
 {
@@ -241,11 +243,14 @@ npm run worker:check
 }
 ```
 
-라우팅 우선순위는 다음 골격만 준비했습니다.
+라우팅 우선순위는 다음과 같습니다.
 
-- `interpret`, `narrate`: Groq 우선
-- `summarize`, `generate-skill`: Gemini 우선
-- fallback: OpenRouter
+- `interpret`, `narrate`: 설정 패널의 1/2/3순위 provider
+- `summarize`, `generate-skill`: Gemini → OpenRouter → Groq
+- 키가 없는 provider는 건너뜀
+- AI 요청 payload는 최근 로그 일부, phase/floor, 로컬 결과 요약처럼 필요한 최소 정보만 보냄
+- prompt/response/API 키는 localStorage에 저장하지 않음
+- Cloudflare Worker relay는 아직 TODO이며 이번 단계에서는 구현하지 않음
 
 
 ## 구현 완료: 인벤토리 보상 아이템 사용/판매와 마법서 습득

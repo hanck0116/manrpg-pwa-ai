@@ -11,6 +11,8 @@ import { getDirectionLabel } from '../game/movement';
 import { loadGameStub, saveGameStub } from '../storage/save';
 import { buyShopItem, canBuyShopItem, getShopItems } from '../rules/shop';
 import { describeSpell } from '../rules/spell';
+import { callLLM } from '../ai/router';
+import { setAISettings, clearAIKeys, type AIProvider, type AISettings } from '../ai/settings';
 import {
   allocatableStatKeys,
   canDecreaseStat,
@@ -23,7 +25,7 @@ import {
 } from '../game/statAllocation';
 import type { Character, Direction, GameState, QueuedAction } from '../state/gameState';
 import { appendLog } from '../state/gameState';
-import { renderAISettings } from './aiSettings';
+import { renderAISettings, setAISettingsStatus } from './aiSettings';
 
 const actionLabels: Record<QueuedAction['type'], string> = {
   move: '이동',
@@ -71,6 +73,67 @@ const createQueuedAction = (type: QueuedAction['type'], direction?: Direction, s
   label: type === 'move' ? `${getDirectionLabel(direction ?? 'up')}으로 ${steps ?? 1}칸 이동` : actionLabels[type],
   direction,
   steps
+});
+
+const appendAILogs = (state: GameState, narration: string, combatLog: string[] = []): GameState => {
+  const withNarration = narration ? appendLog(state, narration) : state;
+  return combatLog.reduce((nextState, log) => appendLog(nextState, log), withNarration);
+};
+
+const getInputValue = (root: HTMLElement, selector: string): string =>
+  root.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)?.value.trim() ?? '';
+
+const getChecked = (root: HTMLElement, selector: string): boolean =>
+  root.querySelector<HTMLInputElement>(selector)?.checked ?? false;
+
+const getSelectValue = (root: HTMLElement, selector: string): AIProvider =>
+  (root.querySelector<HTMLSelectElement>(selector)?.value as AIProvider | undefined) ?? 'groq';
+
+const collectAISettings = (root: HTMLElement): Partial<AISettings> => {
+  const nextSettings: Partial<AISettings> = {
+    enabled: getChecked(root, '[data-ai-enabled]'),
+    saveKeysOnDevice: getChecked(root, '[data-ai-save-keys]'),
+    primaryProvider: getSelectValue(root, '[data-ai-primary-provider]'),
+    secondaryProvider: getSelectValue(root, '[data-ai-secondary-provider]'),
+    tertiaryProvider: getSelectValue(root, '[data-ai-tertiary-provider]'),
+    groqModel: getInputValue(root, '[data-ai-groq-model]'),
+    geminiModel: getInputValue(root, '[data-ai-gemini-model]'),
+    openrouterModel: getInputValue(root, '[data-ai-openrouter-model]')
+  };
+
+  const groqKey = getInputValue(root, '[data-ai-groq-key]');
+  const geminiKey = getInputValue(root, '[data-ai-gemini-key]');
+  const openrouterKey = getInputValue(root, '[data-ai-openrouter-key]');
+
+  if (groqKey) nextSettings.groqKey = groqKey;
+  if (geminiKey) nextSettings.geminiKey = geminiKey;
+  if (openrouterKey) nextSettings.openrouterKey = openrouterKey;
+
+  return nextSettings;
+};
+
+const buildNarrationPayload = (state: GameState): Record<string, unknown> => ({
+  summary: state.log.slice(-5).map((entry) => entry.message),
+  delta: {
+    phase: state.phase,
+    floor: state.floor
+  },
+  localResult: {
+    player: {
+      name: state.player.name,
+      hp: state.player.hp,
+      maxHP: state.player.derived.maxHP,
+      mp: state.player.mp,
+      maxMP: state.player.derived.maxMP,
+      position: state.player.position
+    },
+    enemy: {
+      name: state.enemy.name,
+      hp: state.enemy.hp,
+      maxHP: state.enemy.derived.maxHP,
+      position: state.enemy.position
+    }
+  }
 });
 
 const renderCharacterCard = (character: Character): string => `
@@ -202,6 +265,7 @@ const renderMap = (state: GameState): string => `
 const renderLog = (state: GameState): string => `
   <section class="panel log-panel">
     <h2>전투 로그</h2>
+    <button type="button" data-ai-narrate>AI 문사 생성</button>
     <ol>
       ${state.log.slice(-20).map((entry) => `<li><span>턴 ${entry.turn}</span>${entry.message}</li>`).join('')}
     </ol>
@@ -527,7 +591,7 @@ const updateSelectedButton = (button: HTMLButtonElement, selector: string): void
 };
 
 export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (state: GameState) => void): void => {
-  root.addEventListener('click', (event) => {
+  root.addEventListener('click', async (event) => {
     const target = event.target;
 
     if (!(target instanceof HTMLButtonElement)) {
@@ -546,6 +610,57 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const addBattleItemId = target.dataset.addBattleItem;
     const buyShopItemId = target.dataset.buyShopItem;
     const reaction = target.dataset.reaction as 'dodge' | 'guard' | 'counter' | 'none' | undefined;
+
+    if (target.dataset.aiSaveSettings !== undefined) {
+      setAISettings(collectAISettings(root));
+      setAISettingsStatus('AI 설정을 저장했습니다.');
+      setState(appendLog(getState(), 'AI 설정을 저장했습니다.'));
+      return;
+    }
+
+    if (target.dataset.aiClearKeys !== undefined) {
+      clearAIKeys();
+      setAISettingsStatus('API 키를 지웠습니다.');
+      setState(appendLog(getState(), 'AI API 키를 지웠습니다.'));
+      return;
+    }
+
+    if (target.dataset.aiTest !== undefined) {
+      setAISettings(collectAISettings(root));
+      const response = await callLLM('narrate', {
+        summary: 'AI 연결 테스트',
+        delta: { source: 'settings-panel' },
+        localResult: '규칙 상태 변경 없음'
+      });
+      const fallbackUsed = response.ui_tags.includes('fallback');
+      const message = fallbackUsed ? 'AI 연결 실패 또는 fallback 사용' : 'AI 연결 성공';
+
+      setAISettingsStatus(message);
+      setState(appendAILogs(appendLog(getState(), message), response.narration, response.combat_log));
+      return;
+    }
+
+    if (target.dataset.aiNarrate !== undefined) {
+      const response = await callLLM('narrate', buildNarrationPayload(getState()));
+      setState(appendAILogs(getState(), response.narration, response.combat_log));
+      return;
+    }
+
+    if (target.dataset.aiInterpret !== undefined) {
+      const naturalAction = getInputValue(root, '[data-ai-interpret-input]');
+      if (!naturalAction) {
+        setState(appendLog(getState(), '해석할 자연어 행동을 입력하세요.'));
+        return;
+      }
+
+      const response = await callLLM('interpret', {
+        summary: naturalAction,
+        delta: { phase: getState().phase, floor: getState().floor },
+        localResult: '행동 큐에 추가하지 않고 해석만 표시'
+      });
+      setState(appendAILogs(getState(), response.narration, response.combat_log));
+      return;
+    }
 
     if (reaction) {
       setState(resolvePlayerReaction(getState(), reaction));

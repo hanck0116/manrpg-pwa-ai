@@ -41,6 +41,7 @@
 - [x] RewardItem 타입 원본 makeItem 기준 확장
 - [x] magicTicket random 사용 1차 구현
 - [x] saveVersion 9 반영
+- [x] AI API 1차 구현: 브라우저 직접 BYOK 호출, 수동 GM 묘사/자연어 해석, fallback 유지
 
 ## 남은 TODO
 
@@ -52,7 +53,6 @@
 - [ ] choice 선택권 UI
 - [ ] 마법 특수 효과/상태이상 구현
 - [ ] 전투 중 실제 소모 아이템 추가
-- [ ] AI provider 실제 호출
 - [ ] Worker relay 구현
 - [ ] UI 모바일 최종 정리
 - [ ] 배포 설정
