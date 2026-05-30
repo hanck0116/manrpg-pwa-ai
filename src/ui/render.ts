@@ -37,9 +37,9 @@ const actionLabels: Record<QueuedAction['type'], string> = {
 
 const phaseLabels: Record<GameState['phase'], string> = {
   'player-main': '플레이어 메인턴',
-  'player-reaction': '플레이어 반응턴(TODO)',
+  'player-reaction': '플레이어 반응턴',
   'enemy-main': '적 메인턴',
-  'enemy-reaction': '적 반응턴(TODO)',
+  'enemy-reaction': '적 반응턴',
   'floor-cleared': '층 클리어',
   'reward-pending': '보상 선택 대기',
   'level-up-pending': '레벨업 스탯 분배',
@@ -321,14 +321,14 @@ const renderShopPanel = (state: GameState): string => {
   return `
     <section class="panel shop-panel">
       <details>
-        <summary>Shop</summary>
+        <summary>상점</summary>
         <div class="shop-list">
           ${getShopItems()
             .map(
               (item) => `
                 <div class="reward-row">
-                  <span>${item.name} / ${item.price} coin${item.grade ? ` / ${item.grade}` : ''}</span>
-                  <button type="button" data-buy-shop-item="${item.id}" ${canBuyShopItem(state, item.id) ? '' : 'disabled'}>Buy</button>
+                  <span>${item.name} / 가격 ${item.price}코인${item.grade ? ` / ${item.grade}` : ''}</span>
+                  <button type="button" data-buy-shop-item="${item.id}" ${canBuyShopItem(state, item.id) ? '' : 'disabled'}>구매</button>
                 </div>
               `
             )
@@ -353,8 +353,8 @@ const renderKnownSpells = (state: GameState): string => `
 
                 return `
                   <li>
-                    <span>${spell.name} / ${spell.circle} circle / ${spell.grade} / ${description.category} / MP ${description.manaCost} / power ${description.power}</span>
-                    <button type="button" data-add-spell="${spell.id}" ${disabled}>Queue cast</button>
+                    <span>${spell.name} / ${spell.circle}서클 / ${spell.grade} / ${description.rangeText} / MP ${description.manaCost} / 위력 ${description.power}</span>
+                    <button type="button" data-add-spell="${spell.id}" ${disabled}>큐에 추가</button>
                   </li>
                 `;
               })
@@ -371,16 +371,16 @@ const renderBattleItems = (state: GameState): string => {
   return `
     <section class="panel battle-items-panel">
       <details>
-        <summary>Battle Items</summary>
+        <summary>전투 아이템</summary>
         ${
           items.length === 0
-            ? '<p class="muted">No source-defined battle-usable items are available yet.</p>'
+            ? '<p class="muted">현재 원본 규칙상 전투 중 사용 가능한 아이템이 없습니다.</p>'
             : `<ul class="inventory-list">${items
                 .map(
                   (item) => `
                     <li>
                       <span>${item.name}</span>
-                      <button type="button" data-add-battle-item="${item.id}" ${disabled}>Queue item</button>
+                      <button type="button" data-add-battle-item="${item.id}" ${disabled}>큐에 추가</button>
                     </li>
                   `
                 )
@@ -398,13 +398,14 @@ const renderReactionPanel = (state: GameState): string => {
 
   return `
     <section class="panel reaction-panel">
-      <h2>Reaction</h2>
-      <p class="muted">${state.pendingReaction?.attackLog ?? 'Enemy attack pending.'}</p>
+      <h2>반응턴</h2>
+      <p class="muted">${state.pendingReaction?.attackLog ?? '적 공격에 반응할 수 있습니다.'}</p>
+      <p class="muted">적 공격에 반응할 수 있습니다. 반응은 턴을 소모하지 않습니다.</p>
       <div class="action-grid">
-        <button type="button" data-reaction="dodge">Dodge</button>
-        <button type="button" data-reaction="guard">Guard</button>
-        <button type="button" data-reaction="counter">Counter</button>
-        <button type="button" data-reaction="none">No reaction</button>
+        <button type="button" data-reaction="dodge">회피</button>
+        <button type="button" data-reaction="guard">방어</button>
+        <button type="button" data-reaction="counter">카운터</button>
+        <button type="button" data-reaction="none">반응 안 함</button>
       </div>
     </section>
   `;
@@ -638,7 +639,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
           id: createActionId(),
           type: 'spell',
           spellId: addSpellId,
-          label: `${spell?.name ?? 'Spell'} cast`
+          label: `${spell?.name ?? '마법'} 시전`
         })
       );
       return;
@@ -651,7 +652,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
           id: createActionId(),
           type: 'item',
           itemId: addBattleItemId,
-          label: `${item?.name ?? 'Item'} use`
+          label: `${item?.name ?? '아이템'} 사용`
         })
       );
       return;

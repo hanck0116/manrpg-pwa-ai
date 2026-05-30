@@ -107,20 +107,24 @@ export const getBattleUsableItems = (state: GameState): RewardItem[] => state.in
 
 export const useBattleInventoryItem = (state: GameState, itemId: string): GameState => {
   if (state.phase !== 'player-main') {
-    return appendLog(state, 'Battle items can only be queued from the player main phase.');
+    return appendLog(state, '전투 아이템은 플레이어 메인턴에서만 행동 큐에 넣을 수 있습니다.');
   }
 
   const item = findInventoryItem(state, itemId);
 
   if (!item) {
-    return appendLog(state, 'Use item failed: the selected inventory item was not found.');
+    return appendLog(state, '아이템 사용 실패: 선택한 아이템을 인벤토리에서 찾을 수 없습니다.');
+  }
+
+  if (item.name === '마법서 뽑기권') {
+    return appendLog(state, '마법서 뽑기권 효과는 다음 단계에서 구현 예정입니다.');
   }
 
   if (!canUseItemInBattle(item)) {
-    return appendLog(state, `${item.name} cannot be used during battle. TODO: no source combat-use effect is defined for this item.`);
+    return appendLog(state, `${item.name}은(는) 전투 중 사용할 수 없습니다. 원본 전투 사용 효과가 명확하지 않아 TODO로 남깁니다.`);
   }
 
-  return appendLog(state, `${item.name} has no implemented battle effect yet. TODO: wire source-defined combat consumables only.`);
+  return appendLog(state, `${item.name}의 전투 효과는 아직 구현되지 않았습니다. 원본에 명확한 전투 소모품 효과가 있는 경우에만 연결합니다.`);
 };
 
 export const sellInventoryItem = (state: GameState, itemId: string): GameState => {

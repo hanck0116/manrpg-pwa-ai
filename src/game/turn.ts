@@ -116,6 +116,7 @@ const runAutomaticEnemyTurn = (state: GameState): GameState => {
   return appendLog(
     {
       ...endedAfterEnemyAction,
+      player: { ...endedAfterEnemyAction.player, guarding: false },
       phase: 'player-main',
       turnOwner: 'player'
     },
@@ -190,6 +191,7 @@ export const finishEnemyMainTurn = (state: GameState): GameState => {
   return appendLog(
     {
       ...endedAfterEnemyAction,
+      player: { ...endedAfterEnemyAction.player, guarding: false },
       phase: 'player-main',
       turnOwner: 'player'
     },

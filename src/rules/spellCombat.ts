@@ -21,7 +21,7 @@ export const resolveSpellCast = (caster: Character, target: Character, spell: Le
       ok: false,
       caster,
       target,
-      log: `${caster.name} failed to cast ${spell.name}: MP ${caster.mp}/${description.manaCost}.`
+      log: `${caster.name}의 ${spell.name} 시전 실패: MP가 부족합니다. (${caster.mp}/${description.manaCost})`
     };
   }
 
@@ -37,7 +37,7 @@ export const resolveSpellCast = (caster: Character, target: Character, spell: Le
       ok: true,
       caster: { ...spentCaster, hp: healed },
       target,
-      log: `${caster.name} cast ${spell.name} (${spell.circle} circle): healed ${healed - spentCaster.hp} HP, spent ${description.manaCost} MP.`
+      log: `${caster.name}이(가) ${spell.name} ${spell.circle}서클을 시전했습니다. HP를 ${healed - spentCaster.hp} 회복하고 MP ${description.manaCost}를 소모했습니다.`
     };
   }
 
@@ -46,20 +46,20 @@ export const resolveSpellCast = (caster: Character, target: Character, spell: Le
       ok: true,
       caster: { ...spentCaster, guarding: true },
       target,
-      log: `${caster.name} cast ${spell.name} (${spell.circle} circle): guarding is active, spent ${description.manaCost} MP.`
+      log: `${caster.name}이(가) ${spell.name} ${spell.circle}서클을 시전했습니다. 방어 자세가 활성화되고 MP ${description.manaCost}를 소모했습니다.`
     };
   }
 
   const nextTarget = withHpFloor(target, target.hp - description.power);
   const todoNote =
     description.category === 'summon' || description.category === 'utility'
-      ? ' TODO: detailed summon/utility side effects are intentionally deferred.'
+      ? ' 소환/기능 마법의 상세 부가 효과는 다음 단계에서 구현 예정입니다.'
       : '';
 
   return {
     ok: true,
     caster: spentCaster,
     target: nextTarget,
-    log: `${caster.name} cast ${spell.name} (${spell.circle} circle, ${description.rangeText}): ${description.power} damage to ${target.name}, spent ${description.manaCost} MP.${todoNote}`
+    log: `${caster.name}이(가) ${spell.name} ${spell.circle}서클(${description.rangeText})을 시전했습니다. ${target.name}에게 ${description.power} 피해를 주고 MP ${description.manaCost}를 소모했습니다.${todoNote}`
   };
 };

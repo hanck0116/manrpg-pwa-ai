@@ -31,14 +31,13 @@ export const runEnemyMainTurn = (state: GameState): GameState => {
 
   const baseState = {
     ...state,
-    enemy: { ...state.enemy, guarding: false },
-    player: { ...state.player, guarding: false }
+    enemy: { ...state.enemy, guarding: false }
   };
 
   if (isAdjacent(baseState.enemy, baseState.player)) {
     const result = resolveBasicAttack(baseState.enemy, baseState.player);
 
-    return beginPlayerReaction(baseState, `Enemy action: ${result.log}`, result.damage);
+    return beginPlayerReaction(baseState, `적 행동: ${result.log}`, result.damage);
   }
 
   const direction = chooseDirectionTowardPlayer(baseState);
@@ -48,8 +47,8 @@ export const runEnemyMainTurn = (state: GameState): GameState => {
     movedState.enemy.position.x === baseState.enemy.position.x &&
     movedState.enemy.position.y === baseState.enemy.position.y
   ) {
-    return appendLog(movedState, 'Enemy action: movement path is blocked, so the enemy waits.');
+    return appendLog(movedState, '적 행동: 이동 경로가 막혀 대기했습니다.');
   }
 
-  return appendLog(movedState, 'Enemy action: moved toward the player.');
+  return appendLog(movedState, '적 행동: 플레이어 방향으로 접근했습니다.');
 };

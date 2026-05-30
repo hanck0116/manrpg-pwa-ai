@@ -12,8 +12,8 @@ export const resolveDodgeReaction = (player: Character, enemy: Character): React
   return {
     success: roll.success,
     log: roll.success
-      ? `${player.name} dodged ${enemy.name}'s attack (${roll.roll} <= ${roll.target}).`
-      : `${player.name} failed to dodge ${enemy.name}'s attack (${roll.roll} > ${roll.target}).`
+      ? `${player.name}의 회피 성공: ${enemy.name}의 공격을 피했습니다. (${roll.roll} <= ${roll.target})`
+      : `${player.name}의 회피 실패: ${enemy.name}의 공격을 피하지 못했습니다. (${roll.roll} > ${roll.target})`
   };
 };
 
@@ -23,8 +23,8 @@ export const resolveGuardReaction = (player: Character, enemy: Character): React
   return {
     success: roll.success,
     log: roll.success
-      ? `${player.name} guarded against ${enemy.name}'s attack (${roll.roll} <= ${roll.target}).`
-      : `${player.name} failed to fully guard ${enemy.name}'s attack (${roll.roll} > ${roll.target}).`
+      ? `${player.name}의 방어 성공: ${enemy.name}의 공격을 막았습니다. (${roll.roll} <= ${roll.target})`
+      : `${player.name}의 방어 실패: ${enemy.name}의 공격을 완전히 막지 못했습니다. (${roll.roll} > ${roll.target})`
   };
 };
 
@@ -34,7 +34,7 @@ export const resolveCounterReaction = (player: Character, enemy: Character): Rea
   return {
     success: roll.success,
     log: roll.success
-      ? `${player.name} countered ${enemy.name}'s attack (${roll.roll} <= ${roll.target}).`
-      : `${player.name} failed to counter ${enemy.name}'s attack (${roll.roll} > ${roll.target}).`
+      ? `${player.name}의 카운터 성공: ${enemy.name}의 공격을 흘리고 반격합니다. (${roll.roll} <= ${roll.target})`
+      : `${player.name}의 카운터 실패: ${enemy.name}의 공격을 흘리지 못했습니다. (${roll.roll} > ${roll.target})`
   };
 };

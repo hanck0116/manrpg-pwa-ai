@@ -23,7 +23,7 @@ const withBattleEndedIfNeeded = (state: GameState): GameState => {
         turnOwner: 'player',
         actionQueue: []
       },
-      'Floor cleared: enemy HP reached 0. Move to recovery/reward.'
+      '층 클리어: 적 HP가 0이 되었습니다. 회복/보상 단계로 이동할 수 있습니다.'
     );
   }
 
@@ -36,7 +36,7 @@ const withBattleEndedIfNeeded = (state: GameState): GameState => {
         turnOwner: 'enemy',
         actionQueue: []
       },
-      'Battle ended: player HP reached 0.'
+      '전투 종료: 플레이어 HP가 0이 되었습니다.'
     );
   }
 
@@ -45,23 +45,23 @@ const withBattleEndedIfNeeded = (state: GameState): GameState => {
 
 export const enqueueAction = (state: GameState, action: QueuedAction): GameState => {
   if (state.setupMode) {
-    return appendLog(state, 'Finish character setup before adding battle actions.');
+    return appendLog(state, '캐릭터 생성을 완료해야 전투 행동을 추가할 수 있습니다.');
   }
 
   if (state.levelUpPending || terminalPhases.includes(state.phase)) {
-    return appendLog(state, 'Battle actions cannot be added during recovery/reward/level-up/end phases.');
+    return appendLog(state, '회복/보상/레벨업/전투 종료 단계에서는 전투 행동을 추가할 수 없습니다.');
   }
 
   if (state.phase !== 'player-main') {
-    return appendLog(state, 'Actions can only be queued during the player main phase.');
+    return appendLog(state, '플레이어 메인턴에만 행동을 큐에 추가할 수 있습니다.');
   }
 
   if (state.player.hp <= 0) {
-    return appendLog(state, 'The player is down and cannot add actions.');
+    return appendLog(state, '플레이어가 쓰러진 상태라 행동을 추가할 수 없습니다.');
   }
 
   if (action.type === 'basic-attack' && state.enemy.hp <= 0) {
-    return appendLog(state, 'The enemy is already down.');
+    return appendLog(state, '적이 이미 쓰러져 기본 공격 행동을 추가할 수 없습니다.');
   }
 
   return appendLog(
@@ -70,7 +70,7 @@ export const enqueueAction = (state: GameState, action: QueuedAction): GameState
       actionQueue: [...state.actionQueue, action],
       selectedAction: action.label
     },
-    `Queued action: ${action.label}`
+    `행동 큐에 추가: ${action.label}`
   );
 };
 
@@ -86,13 +86,13 @@ export const clearActionQueue = (state: GameState): GameState => ({
 
 const executeSpellAction = (state: GameState, action: QueuedAction): GameState => {
   if (!action.spellId) {
-    return appendLog(state, 'Cast failed: choose a known spell before queuing a spell action.');
+    return appendLog(state, '시전 실패: 행동 큐에 넣을 보유 마법을 선택해야 합니다.');
   }
 
   const spell = state.spells.find((knownSpell) => knownSpell.id === action.spellId);
 
   if (!spell) {
-    return appendLog(state, 'Cast failed: the selected spell is not known.');
+    return appendLog(state, '시전 실패: 보유하지 않은 마법입니다.');
   }
 
   const result = resolveSpellCast(state.player, state.enemy, spell);
@@ -109,7 +109,7 @@ const executeSpellAction = (state: GameState, action: QueuedAction): GameState =
 
 const executeItemAction = (state: GameState, action: QueuedAction): GameState => {
   if (!action.itemId) {
-    return appendLog(state, 'Use item failed: choose an item before queuing an item action.');
+    return appendLog(state, '아이템 사용 실패: 행동 큐에 넣을 아이템을 선택해야 합니다.');
   }
 
   return useBattleInventoryItem(state, action.itemId);
@@ -147,16 +147,16 @@ const executeQueuedAction = (state: GameState, action: QueuedAction): GameState 
           ...baseState,
           player: { ...baseState.player, guarding: true }
         },
-        'Player takes a guard stance.'
+        '플레이어가 방어 자세를 취했습니다.'
       );
     case 'skill':
-      return appendLog(baseState, 'Skill effects are TODO until the source rule is mapped.');
+      return appendLog(baseState, '스킬 효과는 원본 규칙 확인 후 구현 예정입니다.');
     case 'spell':
       return executeSpellAction(baseState, action);
     case 'item':
       return executeItemAction(baseState, action);
     case 'wait':
-      return appendLog(baseState, 'Player waits.');
+      return appendLog(baseState, '플레이어가 대기했습니다.');
   }
 };
 
@@ -165,8 +165,8 @@ export const executeActionQueue = (state: GameState): GameState => {
     return appendLog(
       state,
       state.setupMode
-        ? 'Finish character setup before executing battle actions.'
-        : 'Battle actions can only execute during the player main phase.'
+        ? '캐릭터 생성을 완료해야 전투 행동을 실행할 수 있습니다.'
+        : '플레이어 메인턴에만 전투 행동을 실행할 수 있습니다.'
     );
   }
 

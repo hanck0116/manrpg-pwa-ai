@@ -57,6 +57,78 @@ export const SPELL_MP: Record<SpellCircle, number> = {
   9: 900
 };
 
+export const UTILITY_SPELLS = [
+  '라이트',
+  '그리스',
+  '디그',
+  '다크니스',
+  '슬립',
+  '캔슬레이션',
+  '웹',
+  '메모라이즈',
+  '블라인드',
+  '슬로우',
+  '사일런스',
+  '일루젼',
+  '컨퓨전',
+  '인비저빌리티',
+  '디스토션',
+  '블링크',
+  '텔레포트',
+  '워프',
+  '컨트롤 웨더',
+  '매스 텔레포트',
+  '워프 게이트'
+];
+
+export const DEFENSE_SPELLS = [
+  '쉴드',
+  '샤이닝 디펜스',
+  '배리어',
+  '안티 매직 쉘',
+  '그레이트 쉴드',
+  '리플렉션',
+  '앱솔루트 쉴드'
+];
+
+export const HEAL_SPELLS = ['힐', '그레이트 힐', '라이프 드레인'];
+
+export const AREA_SPELLS = [
+  '샤이닝 웨이브',
+  '샤이닝 필드',
+  '익스플로전',
+  '체인 라이트닝',
+  '파이어 월',
+  '다크 필드',
+  '토네이도',
+  '인페르노',
+  '블리자드',
+  '어스 퀘이크',
+  '윈드 스톰',
+  '샤이닝 레인',
+  '볼케이노',
+  '아이스 크리스탈 오브 스톰',
+  '퓨리 오브 더 헤븐',
+  '라이트닝 인피니티',
+  '헬파이어',
+  '메테오 스웜',
+  '라이트닝 월드',
+  '루인 오브 그라운드',
+  '엘리멘탈 퍼니시먼트',
+  '네크로폴리스'
+];
+
+export const SMALL_AREA_SPELLS = ['파이어 볼', '아이스 볼', '에어로 봄', '다크 볼'];
+
+export const SINGLE_HIGH_SPELLS = [
+  '레이져',
+  '샤이닝 레이져',
+  '다크 캐논',
+  '메테오 스트라이크',
+  '파워 워드 킬',
+  '앱솔루트 제로 포인트'
+];
+
 export const SPELLS: Record<SpellCircle, string[]> = {
   1: ['라이트', '파이어', '아이스', '윈드', '매직 애로우', '그리스', '디그', '다크니스'],
   2: ['샤이닝 에로우', '파이어 애로우', '아이스 애로우', '윈드 애로우', '록 애로우', '라이트닝 애로우', '쉴드', '힐', '아이스 포그', '다크 애로우'],
@@ -143,15 +215,13 @@ export const tryLearnMagicBook = (wisdom: number, grade: string): TryLearnMagicB
 };
 
 export const spellCategory = (name: string): SpellCategory => {
-  const normalized = name.toLowerCase();
-
-  if (/(heal|cure|recovery|restore|힐|치유|회복)/i.test(name)) return 'heal';
-  if (/(barrier|shield|guard|armor|protection|방어|보호|배리어)/i.test(name)) return 'defense';
-  if (/(summon|golem|dragon|소환)/i.test(name)) return 'summon';
-  if (/(teleport|control|silence|blind|slow|haste|gravity|bind|utility|이동|제어)/i.test(name)) return 'utility';
-  if (/(storm|rain|field|wave|inferno|meteor|mass|area|nova|quake|전체|광역)/i.test(name)) return 'area';
-  if (/(arrow|bolt|spark|chain|cannon|beam|single|화살|탄환)/i.test(name)) return 'singleHigh';
-  if (/(ball|burst|flare|circle|cone|small|범위)/i.test(name) || normalized.includes('aoe')) return 'smallArea';
+  if (UTILITY_SPELLS.includes(name)) return 'utility';
+  if (DEFENSE_SPELLS.includes(name)) return 'defense';
+  if (HEAL_SPELLS.includes(name)) return 'heal';
+  if (name.startsWith('서먼')) return 'summon';
+  if (AREA_SPELLS.includes(name)) return 'area';
+  if (SMALL_AREA_SPELLS.includes(name)) return 'smallArea';
+  if (SINGLE_HIGH_SPELLS.includes(name)) return 'singleHigh';
 
   return 'single';
 };
@@ -159,22 +229,23 @@ export const spellCategory = (name: string): SpellCategory => {
 export const spellRangeText = (category: SpellCategory): string => {
   switch (category) {
     case 'singleHigh':
+      return '단일 고집중';
     case 'single':
-      return 'single target';
+      return '단일';
     case 'smallArea':
-      return 'small area, resolved against the one current enemy';
+      return '좁은 범위';
     case 'area':
-      return 'area, resolved against the one current enemy';
+      return '광역';
     case 'defense':
-      return 'self defense';
+      return '방어';
     case 'heal':
-      return 'self heal';
+      return '회복';
     case 'summon':
-      return 'summon impact, resolved against the one current enemy';
+      return '소환';
     case 'utility':
-      return 'utility impact, resolved against the one current enemy';
+      return '기능';
     case 'other':
-      return 'other';
+      return '기타';
   }
 };
 
