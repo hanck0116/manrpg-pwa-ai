@@ -49,6 +49,15 @@ export const renderAISettings = (): string => {
         <input type="checkbox" data-ai-enabled ${settings.enabled ? 'checked' : ''} />
       </label>
       <label>
+        Worker 프록시 사용
+        <input type="checkbox" data-ai-use-proxy ${settings.useProxy ? 'checked' : ''} />
+      </label>
+      <label>
+        Worker URL
+        <input type="url" data-ai-proxy-url value="${escapeAttr(settings.proxyUrl)}" placeholder="https://your-worker.example.workers.dev" />
+      </label>
+      <p class="muted">프록시 사용 시 API 요청은 Worker를 통해 전달됩니다. 규칙 판정은 여전히 로컬에서 처리됩니다.</p>
+      <label>
         1순위 Provider
         <select data-ai-primary-provider>${renderProviderOptions(settings.primaryProvider)}</select>
       </label>

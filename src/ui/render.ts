@@ -105,6 +105,8 @@ const getSelectValue = (root: HTMLElement, selector: string): AIProvider =>
 const collectAISettings = (root: HTMLElement): Partial<AISettings> => {
   const nextSettings: Partial<AISettings> = {
     enabled: getChecked(root, '[data-ai-enabled]'),
+    useProxy: getChecked(root, '[data-ai-use-proxy]'),
+    proxyUrl: getInputValue(root, '[data-ai-proxy-url]'),
     saveKeysOnDevice: getChecked(root, '[data-ai-save-keys]'),
     primaryProvider: getSelectValue(root, '[data-ai-primary-provider]'),
     secondaryProvider: getSelectValue(root, '[data-ai-secondary-provider]'),

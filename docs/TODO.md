@@ -49,10 +49,14 @@
 - [x] magicTicket select 선택 UI
 - [x] choice 선택권 UI 1차
 - [x] saveVersion 10 반영
+- [x] Worker relay 1차 구현
+- [x] Worker URL 설정 UI
+- [x] docs/WORKER.md 작성
 
 ## 남은 TODO
 
-- [ ] Worker relay 구현
+- [ ] Worker 운영 안정화
+- [ ] provider별 사용량/비용 표시
 - [ ] choice 선택권 실제 효과 구현
 - [ ] 일반 판정의 상황별 성공조건 정리
 - [ ] 스킬 실제 효과 구현

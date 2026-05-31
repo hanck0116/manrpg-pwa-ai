@@ -11,7 +11,8 @@ ManRPG를 **실행 가능한 PWA 기본 골격 + 로컬 규칙 엔진 + 고정 7
 - AI 응답은 로컬 규칙 결과를 덮어쓸 수 없으며 HP/MP/피해/보상 등 판정은 모두 로컬 TS 코드가 처리
 - 브라우저 직접 BYOK 방식으로 Groq/Gemini/OpenRouter를 호출할 수 있음
 - AI API 1차 구현 완료: AI 묘사 생성과 자연어 행동 해석 UI 제공
-- Worker relay는 아직 TODO이며, 현재는 브라우저 직접 BYOK 호출만 사용
+- AI 사용 방식은 Direct BYOK와 Worker Proxy 모드를 지원
+- Worker는 규칙 판정 서버가 아니라 LLM relay이며, API 실패 시 fallback으로 게임 진행 유지
 - API 키는 기본적으로 메모리에만 보관하며, 사용자가 “이 기기에 API 키 저장”을 체크한 경우에만 localStorage에 저장
 - 브라우저 localStorage 키 저장은 개인 테스트용 편의 기능이며 안전한 비밀 저장소가 아님
 - 플레이어는 항상 1명
@@ -57,6 +58,8 @@ npm run dev
 개발 서버가 뜨면 터미널에 표시되는 Vite URL(기본: `http://localhost:5173`)로 접속합니다.
 
 실험 체크리스트는 [docs/TESTING.md](docs/TESTING.md)를 확인합니다.
+
+Cloudflare Worker relay 설정은 [docs/WORKER.md](docs/WORKER.md)를 확인합니다.
 
 ## 사용 가능한 스크립트
 
@@ -195,9 +198,9 @@ npm run build
   - `floor`, `rewardState`, `inventory`, `spells`, `levelUpPending`, `pendingReaction`, `pendingChoice`를 포함한 현재 구조만 유효 저장으로 취급
   - saveVersion 10이 아니거나 깨진 저장 데이터는 초기 상태로 복구
   - actionQueue와 `spellId`/`itemId`/`reactionType` 저장/복구
-- 접이식 AI 설정 패널 자리
-- Cloudflare Worker stub
-- AI 라우터 및 provider stub
+- 접이식 AI 설정 패널
+- Cloudflare Worker relay 1차
+- AI 라우터 및 provider fallback
 
 ## 로컬 규칙 엔진 구현 상태
 
@@ -272,7 +275,8 @@ npm run build
 - 스킬 초기화권 실제 효과 구현
 - 마법 특수 효과/상태이상 구현
 - 전투 중 실제 소모 아이템 추가
-- Worker relay 구현
+- Worker 운영 안정화
+- provider별 사용량/비용 표시
 - UI 모바일 최종 정리
 - 배포 후 버그 수정
 
@@ -295,7 +299,9 @@ npm run build
 - 키가 없는 provider는 건너뜀
 - AI 요청 payload는 최근 로그 일부, phase/floor, 로컬 결과 요약처럼 필요한 최소 정보만 보냄
 - prompt/response/API 키는 localStorage에 저장하지 않음
-- Cloudflare Worker relay는 아직 TODO이며 이번 단계에서는 구현하지 않음
+- Direct BYOK 모드는 브라우저가 provider API를 직접 호출
+- Worker Proxy 모드는 브라우저가 Worker `/llm`을 호출하고 Worker가 provider API를 중계
+- Worker는 HP/MP/피해/보상/위치/스탯을 계산하지 않으며 규칙 결과를 수정하지 않음
 
 
 ## 구현 완료: 인벤토리 보상 아이템 사용/판매와 마법서 습득

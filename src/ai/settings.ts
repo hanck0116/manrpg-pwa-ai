@@ -5,6 +5,7 @@ export type AIProvider = ProviderName;
 export type AISettings = {
   enabled: boolean;
   useProxy: boolean;
+  proxyUrl: string;
   saveKeysOnDevice: boolean;
   primaryProvider: AIProvider;
   secondaryProvider: AIProvider;
@@ -22,6 +23,7 @@ const STORAGE_KEY = 'manrpg-pwa-ai:ai-settings:v1';
 export const defaultAISettings: AISettings = {
   enabled: false,
   useProxy: false,
+  proxyUrl: '',
   saveKeysOnDevice: false,
   primaryProvider: 'groq',
   secondaryProvider: 'openrouter',
@@ -68,6 +70,7 @@ const writeStoredSettings = (settings: AISettings): void => {
   const stored: Partial<AISettings> = {
     enabled: settings.enabled,
     useProxy: settings.useProxy,
+    proxyUrl: settings.proxyUrl,
     saveKeysOnDevice: settings.saveKeysOnDevice,
     primaryProvider: settings.primaryProvider,
     secondaryProvider: settings.secondaryProvider,

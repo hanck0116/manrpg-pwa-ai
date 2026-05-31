@@ -1,6 +1,7 @@
 import { callGemini } from './providers/gemini';
 import { callGroq } from './providers/groq';
 import { callOpenRouter } from './providers/openrouter';
+import { callViaProxy } from './providers/proxy';
 import { getAISettings, getProviderOrder, hasProviderKey, type AISettings } from './settings';
 import type { LLMPayload, LLMResponse, LLMTask, ProviderName, ProviderPriority } from './types';
 
@@ -37,6 +38,21 @@ export const callLLM = async (task: LLMTask, payload: LLMPayload): Promise<LLMRe
   }
 
   for (const provider of getProviderOrder(task, settings)) {
+    if (settings.useProxy && settings.proxyUrl.trim()) {
+      try {
+        const response = await callViaProxy(provider, task, payload, settings);
+        return {
+          narration: response.narration,
+          combat_log: response.combat_log,
+          ui_tags: [...response.ui_tags, `provider:${provider}`, 'proxy']
+        };
+      } catch {
+        // Proxy/provider failures are intentionally silent and fall through.
+      }
+
+      continue;
+    }
+
     if (!hasProviderKey(provider, settings)) {
       continue;
     }
