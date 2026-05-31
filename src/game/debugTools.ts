@@ -1,4 +1,5 @@
 import { makeItem } from '../rules/reward';
+import { createPlayerSkill } from '../rules/skill';
 import { SPELLS } from '../rules/spell';
 import { clearSavedGame } from '../storage/save';
 import { appendLog, createInitialGameState, type GameState, type LearnedSpell } from '../state/gameState';
@@ -60,6 +61,26 @@ export const grantTestSpell = (state: GameState): GameState => {
     `${spell.name} ${spell.circle}서클을 테스트 편의로 지급했습니다. 원본 SPELLS 목록에 있는 마법만 사용합니다.`
   );
 };
+
+export const grantTestSkill = (state: GameState): GameState =>
+  debugLog(
+    {
+      ...state,
+      skills: [
+        ...state.skills,
+        createPlayerSkill({
+          name: '테스트 외공 공격',
+          resourceType: 'outer',
+          timing: 'main',
+          effectType: 'damage',
+          target: 'enemy',
+          multiplier: 1,
+          source: 'debug'
+        })
+      ]
+    },
+    '원본 규칙 진행이 아니라 테스트 편의로 기본 외공 공격 스킬을 지급했습니다.'
+  );
 
 export const setEnemyHpToOne = (state: GameState): GameState =>
   debugLog(

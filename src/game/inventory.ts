@@ -176,7 +176,13 @@ export const useInventoryItem = (state: GameState, itemId: string): GameState =>
   }
 
   if (item.type === 'reset') {
-    return appendLog(state, '스킬 시스템 구현 후 사용할 수 있습니다.');
+    return appendLog(
+      {
+        ...removeItemWithoutLog(state, itemId),
+        skills: []
+      },
+      '스킬 초기화권 사용: 보유 스킬을 초기화했습니다.'
+    );
   }
 
   return appendLog(state, '이 아이템의 사용 효과는 아직 구현되지 않았습니다.');

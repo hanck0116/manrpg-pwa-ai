@@ -41,6 +41,7 @@ export type QueuedAction = {
   label: string;
   direction?: Direction;
   steps?: number;
+  skillId?: string;
   spellId?: string;
   itemId?: string;
   reactionType?: 'dodge' | 'guard' | 'counter';
@@ -92,6 +93,23 @@ export type LearnedSpell = {
   sourceItemName?: string;
 };
 
+export type SkillResourceType = 'outer' | 'inner' | 'sword' | 'magic' | 'none';
+export type SkillTiming = 'main' | 'reaction' | 'passive';
+
+export type PlayerSkill = {
+  id: string;
+  name: string;
+  description?: string;
+  resourceType: SkillResourceType;
+  timing: SkillTiming;
+  multiplier: number;
+  cost?: number;
+  range?: number;
+  target: 'enemy' | 'self';
+  effectType: 'damage' | 'heal' | 'guard' | 'todo';
+  source?: string;
+};
+
 export type RewardState = {
   offered: RewardItem[];
   selectedIds: string[];
@@ -131,6 +149,7 @@ export type GameState = {
   rewardState?: RewardState;
   inventory: RewardItem[];
   spells: LearnedSpell[];
+  skills: PlayerSkill[];
   battleResult?: BattleResult;
   pendingReaction?: PendingReaction;
   pendingChoice?: PendingChoice;
@@ -221,7 +240,8 @@ export const createInitialGameState = (): GameState => {
     turnOwner: initiative,
     rewardState: undefined,
     inventory: [],
-    spells: []
+    spells: [],
+    skills: []
   };
 };
 

@@ -7,12 +7,14 @@ import {
   type LearnedSpell,
   type PendingChoice,
   type PendingChoiceOption,
+  type PlayerSkill,
   type RewardItem,
   type RewardState
 } from '../state/gameState';
 
-export const SAVE_KEY = 'manrpg-pwa-ai:save:v10';
+export const SAVE_KEY = 'manrpg-pwa-ai:save:v11';
 export const LEGACY_SAVE_KEYS = [
+  'manrpg-pwa-ai:save:v10',
   'manrpg-pwa-ai:save:v9',
   'manrpg-pwa-ai:save:v8',
   'manrpg-pwa-ai:save:v7',
@@ -23,7 +25,7 @@ export const LEGACY_SAVE_KEYS = [
   'manrpg-pwa-ai:save:v2',
   'manrpg-pwa-ai:save:v1'
 ];
-const SAVE_VERSION = 10;
+const SAVE_VERSION = 11;
 
 type SavePayload = {
   saveVersion: number;
@@ -34,6 +36,9 @@ const validPhases = ['player-main', 'player-reaction', 'enemy-main', 'enemy-reac
 const validRewardTypes: RewardItem['type'][] = ['coin', 'martial', 'magicBook', 'magicTicket', 'choice', 'multiItem', 'multi', 'reset', 'trait', 'special', 'item'];
 const validActionTypes = ['move', 'basic-attack', 'skill', 'spell', 'item', 'defend', 'wait'];
 const validReactionTypes = ['dodge', 'guard', 'counter'];
+const validSkillResourceTypes: PlayerSkill['resourceType'][] = ['outer', 'inner', 'sword', 'magic', 'none'];
+const validSkillTimings: PlayerSkill['timing'][] = ['main', 'reaction', 'passive'];
+const validSkillEffectTypes: PlayerSkill['effectType'][] = ['damage', 'heal', 'guard', 'todo'];
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -146,9 +151,30 @@ const isValidQueuedAction = (value: unknown): boolean => {
     validActionTypes.includes(value.type as string) &&
     (value.direction === undefined || value.direction === 'up' || value.direction === 'down' || value.direction === 'left' || value.direction === 'right') &&
     (value.steps === undefined || isNumber(value.steps)) &&
+    (value.skillId === undefined || typeof value.skillId === 'string') &&
     (value.spellId === undefined || typeof value.spellId === 'string') &&
     (value.itemId === undefined || typeof value.itemId === 'string') &&
     (value.reactionType === undefined || validReactionTypes.includes(value.reactionType as string))
+  );
+};
+
+const isValidPlayerSkill = (value: unknown): value is PlayerSkill => {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.name === 'string' &&
+    (value.description === undefined || typeof value.description === 'string') &&
+    validSkillResourceTypes.includes(value.resourceType as PlayerSkill['resourceType']) &&
+    validSkillTimings.includes(value.timing as PlayerSkill['timing']) &&
+    isNumber(value.multiplier) &&
+    (value.cost === undefined || isNumber(value.cost)) &&
+    (value.range === undefined || isNumber(value.range)) &&
+    (value.target === 'enemy' || value.target === 'self') &&
+    validSkillEffectTypes.includes(value.effectType as PlayerSkill['effectType']) &&
+    (value.source === undefined || typeof value.source === 'string')
   );
 };
 
@@ -216,6 +242,8 @@ const isValidGameState = (value: unknown): value is GameState => {
     value.inventory.every(isValidRewardItem) &&
     Array.isArray(value.spells) &&
     value.spells.every(isValidLearnedSpell) &&
+    Array.isArray(value.skills) &&
+    value.skills.every(isValidPlayerSkill) &&
     (value.rewardState === undefined || isValidRewardState(value.rewardState)) &&
     (value.pendingReaction === undefined || isValidPendingReaction(value.pendingReaction)) &&
     (value.pendingChoice === undefined || isValidPendingChoice(value.pendingChoice))

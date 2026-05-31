@@ -7,6 +7,7 @@ import {
   fullRecoverPlayer,
   grantTestCoins,
   grantTestRewards,
+  grantTestSkill,
   grantTestSpell,
   resetAllProgress,
   setEnemyHpToOne
@@ -25,6 +26,7 @@ import { describeSpell } from '../rules/spell';
 import { callLLM } from '../ai/router';
 import { setAISettings, clearAIKeys, getAISettings, type AIProvider, type AISettings } from '../ai/settings';
 import { clearAIUsage } from '../ai/usage';
+import { addPlayerSkill } from '../game/skillBook';
 import {
   allocatableStatKeys,
   canDecreaseStat,
@@ -85,6 +87,13 @@ const createQueuedAction = (type: QueuedAction['type'], direction?: Direction, s
   label: type === 'move' ? `${getDirectionLabel(direction ?? 'up')}으로 ${steps ?? 1}칸 이동` : actionLabels[type],
   direction,
   steps
+});
+
+const createSkillAction = (skillId: string, skillName: string): QueuedAction => ({
+  id: createActionId(),
+  type: 'skill',
+  skillId,
+  label: `${skillName} 사용`
 });
 
 const appendAILogs = (state: GameState, narration: string, combatLog: string[] = []): GameState => {
@@ -300,6 +309,7 @@ const renderDebugPanel = (): string => `
       <button type="button" data-debug-action="coins">테스트용 코인 +50</button>
       <button type="button" data-debug-action="rewards">테스트용 보상 아이템 지급</button>
       <button type="button" data-debug-action="spell">테스트용 마법 지급</button>
+      <button type="button" data-debug-action="skill">테스트용 스킬 지급</button>
       <button type="button" data-debug-action="enemy-hp-one">적 HP 1로 만들기</button>
       <button type="button" data-debug-action="recover">플레이어 HP/MP 최대 회복</button>
     </div>
@@ -494,6 +504,58 @@ const renderKnownSpells = (state: GameState): string => `
   </section>
 `;
 
+const renderKnownSkills = (state: GameState): string => {
+  const canQueueSkill = state.phase === 'player-main' && !state.setupMode && !state.levelUpPending;
+  const canCreate = ['floor-cleared', 'reward-pending', 'level-up-pending', 'battle-ended'].includes(state.phase);
+
+  return `
+    <section class="panel skills-panel">
+      <details>
+        <summary>보유 스킬 (${state.skills.length})</summary>
+        ${
+          state.skills.length === 0
+            ? '<p class="muted">보유 스킬이 없습니다.</p>'
+            : `<ul class="inventory-list">${state.skills
+                .map(
+                  (skill) => `
+                    <li>
+                      <span>${skill.name} / ${skill.resourceType} / ${skill.timing} / ${skill.effectType} / ${skill.multiplier}배</span>
+                      <button type="button" data-add-skill="${skill.id}" ${canQueueSkill && skill.timing === 'main' ? '' : 'disabled'}>큐에 추가</button>
+                    </li>
+                  `
+                )
+                .join('')}</ul>`
+        }
+      </details>
+      <details>
+        <summary>스킬 생성</summary>
+        <p class="muted">원본 시트지 기반의 최소 스킬 구조입니다. 상태이상/소환/광역 효과는 만들지 않습니다.</p>
+        <label>스킬 이름 <input type="text" data-skill-name placeholder="스킬 이름" /></label>
+        <label>자원 유형
+          <select data-skill-resource>
+            <option value="outer">외공</option>
+            <option value="inner">내공</option>
+            <option value="sword">검기</option>
+            <option value="magic">마법</option>
+            <option value="none">없음</option>
+          </select>
+        </label>
+        <label>효과 유형
+          <select data-skill-effect>
+            <option value="damage">피해</option>
+            <option value="heal">회복</option>
+            <option value="guard">방어</option>
+            <option value="todo">TODO</option>
+          </select>
+        </label>
+        <label>배율 <input type="number" min="0.1" step="0.1" data-skill-multiplier value="1" /></label>
+        <label>설명 <textarea rows="2" data-skill-description placeholder="원본 확인용 설명"></textarea></label>
+        <button type="button" data-create-skill ${canCreate ? '' : 'disabled'}>스킬 생성</button>
+      </details>
+    </section>
+  `;
+};
+
 const renderBattleItems = (state: GameState): string => {
   const items = getBattleUsableItems(state);
   const disabled = state.phase === 'player-main' && !state.setupMode && !state.levelUpPending ? '' : 'disabled';
@@ -633,6 +695,7 @@ const template = (state: GameState): string => `
     ${renderInventorySummary(state)}
     ${renderPendingChoicePanel(state)}
     ${renderKnownSpells(state)}
+    ${renderKnownSkills(state)}
     ${renderBattleItems(state)}
     ${renderReactionPanel(state)}
     ${renderActionQueue(state)}
@@ -675,6 +738,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const useItemId = target.dataset.useItem;
     const sellItemId = target.dataset.sellItem;
     const addSpellId = target.dataset.addSpell;
+    const addSkillId = target.dataset.addSkill;
     const addBattleItemId = target.dataset.addBattleItem;
     const buyShopItemId = target.dataset.buyShopItem;
     const confirmChoiceId = target.dataset.confirmChoice;
@@ -717,6 +781,11 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
 
         if (debugAction === 'spell') {
           setState(grantTestSpell(getState()));
+          return;
+        }
+
+        if (debugAction === 'skill') {
+          setState(grantTestSkill(getState()));
           return;
         }
 
@@ -955,6 +1024,30 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
           type: 'spell',
           spellId: addSpellId,
           label: `${spell?.name ?? '마법'} 시전`
+        })
+      );
+      return;
+    }
+
+    if (addSkillId) {
+      const skill = getState().skills.find((knownSkill) => knownSkill.id === addSkillId);
+      setState(enqueueAction(getState(), createSkillAction(addSkillId, skill?.name ?? '스킬')));
+      return;
+    }
+
+    if (target.dataset.createSkill !== undefined) {
+      const effectType = getInputValue(root, '[data-skill-effect]') as 'damage' | 'heal' | 'guard' | 'todo';
+      const targetType = effectType === 'damage' ? 'enemy' : 'self';
+      setState(
+        addPlayerSkill(getState(), {
+          name: getInputValue(root, '[data-skill-name]'),
+          description: getInputValue(root, '[data-skill-description]'),
+          resourceType: getInputValue(root, '[data-skill-resource]') as 'outer' | 'inner' | 'sword' | 'magic' | 'none',
+          timing: 'main',
+          effectType,
+          target: targetType,
+          multiplier: Number(getInputValue(root, '[data-skill-multiplier]') || 1),
+          source: 'user'
         })
       );
       return;

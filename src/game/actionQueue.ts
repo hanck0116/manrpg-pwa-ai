@@ -1,6 +1,7 @@
 import { useBattleInventoryItem } from './inventory';
 import { moveCharacterSteps } from './movement';
 import { resolveBasicAttack } from '../rules/combat';
+import { resolveSkillUse } from '../rules/skillCombat';
 import { resolveSpellCast } from '../rules/spellCombat';
 import { appendLog, type GameState, type QueuedAction } from '../state/gameState';
 
@@ -115,6 +116,33 @@ const executeItemAction = (state: GameState, action: QueuedAction): GameState =>
   return useBattleInventoryItem(state, action.itemId);
 };
 
+const executeSkillAction = (state: GameState, action: QueuedAction): GameState => {
+  if (!action.skillId) {
+    return appendLog(state, '스킬 사용 실패: 사용할 스킬을 선택해야 합니다.');
+  }
+
+  const skill = state.skills.find((playerSkill) => playerSkill.id === action.skillId);
+
+  if (!skill) {
+    return appendLog(state, '스킬 사용 실패: 보유하지 않은 스킬입니다.');
+  }
+
+  if (skill.timing !== 'main') {
+    return appendLog(state, '스킬 사용 실패: 이번 단계에서는 메인턴 스킬만 전투 큐에서 사용할 수 있습니다.');
+  }
+
+  const result = resolveSkillUse(state.player, state.enemy, skill);
+
+  return appendLog(
+    {
+      ...state,
+      player: result.player,
+      enemy: result.enemy
+    },
+    result.log
+  );
+};
+
 const executeQueuedAction = (state: GameState, action: QueuedAction): GameState => {
   if (isActionBlockedPhase(state)) {
     return withBattleEndedIfNeeded(state);
@@ -150,7 +178,7 @@ const executeQueuedAction = (state: GameState, action: QueuedAction): GameState 
         '플레이어가 방어 자세를 취했습니다.'
       );
     case 'skill':
-      return appendLog(baseState, '스킬 효과는 원본 규칙 확인 후 구현 예정입니다.');
+      return executeSkillAction(baseState, action);
     case 'spell':
       return executeSpellAction(baseState, action);
     case 'item':

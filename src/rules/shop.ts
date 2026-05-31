@@ -20,7 +20,7 @@ export const SHOP_BUY_LIST: ShopItem[] = [
   { id: 'inner-book', name: '내공서', type: 'martial', price: 10, description: '정비 단계에서 사용하면 내공이 1 증가합니다.' },
   { id: 'sword-ki', name: '검기', type: 'martial', price: 30, description: '정비 단계에서 사용하면 검기가 1 증가합니다. 최대 6단계입니다.' },
   { id: 'magic-draw-ticket', name: '기초 마법서 뽑기권', type: 'magicTicket', price: 15, grade: '기초', description: '사용하면 기초 등급 범위의 마법 1개를 즉시 획득합니다.' },
-  { id: 'skill-reset', name: '스킬 초기화권', type: 'reset', price: 10, description: '스킬 초기화 효과는 다음 단계에서 구현 예정입니다.' }
+  { id: 'skill-reset', name: '스킬 초기화권', type: 'reset', price: 10, description: '보유 스킬을 초기화합니다.' }
 ];
 
 const maintenanceShopPhases: GameState['phase'][] = ['floor-cleared', 'reward-pending', 'level-up-pending', 'battle-ended'];

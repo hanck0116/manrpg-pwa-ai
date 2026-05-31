@@ -91,12 +91,12 @@ describe('choice flow', () => {
     expect(next.log.at(-1)?.message).toContain('실제 효과는 원본 규칙 확인 후 구현 예정입니다.');
   });
 
-  it('round-trips saveVersion 10 state with pendingChoice', () => {
+  it('round-trips saveVersion 11 state with pendingChoice', () => {
     vi.stubGlobal('localStorage', createLocalStorage());
     const item = makeItem('기초 마법서 선택권');
     const pending = useInventoryItem({ ...maintenanceState(), inventory: [item] }, item.id);
 
-    expect(saveGameStub(pending)).toContain('saveVersion 10');
+    expect(saveGameStub(pending)).toContain('saveVersion 11');
     expect(loadGameStub().pendingChoice).toMatchObject({
       kind: 'magicTicketSelect',
       sourceItemName: '기초 마법서 선택권'
