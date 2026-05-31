@@ -1,7 +1,8 @@
 {
   "name": "ManRPG PWA AI",
   "short_name": "ManRPG",
-  "start_url": "/",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#161821",
   "theme_color": "#161821",

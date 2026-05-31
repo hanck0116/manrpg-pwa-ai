@@ -59,8 +59,28 @@ npm run dev
 ```bash
 npm run dev
 npm run build
+npm run test
 npm run preview
 npm run worker:check
+```
+
+## GitHub Pages 배포
+
+이 앱은 GitHub Pages의 프로젝트 사이트 경로에서 동작하도록 Vite `base`가 `/manrpg-pwa-ai/`로 설정되어 있습니다.
+
+배포는 `.github/workflows/deploy.yml`에서 자동으로 실행됩니다. `main` 브랜치에 push하면 GitHub Actions가 다음 순서로 진행합니다.
+
+```bash
+npm install
+npm run build
+```
+
+빌드가 성공하면 `dist` 디렉터리가 GitHub Pages에 배포됩니다. 저장소의 Settings > Pages에서 Source를 GitHub Actions로 설정해 두면 됩니다.
+
+배포 후 접속 주소:
+
+```text
+https://sky88-1004.github.io/manrpg-pwa-ai/
 ```
 
 ## 현재 구현된 기능
