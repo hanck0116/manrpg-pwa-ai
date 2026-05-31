@@ -68,20 +68,33 @@ npm run worker:check
 
 이 앱은 GitHub Pages의 프로젝트 사이트 경로에서 동작하도록 Vite `base`가 `/manrpg-pwa-ai/`로 설정되어 있습니다.
 
-배포는 `.github/workflows/deploy.yml`에서 자동으로 실행됩니다. `main` 브랜치에 push하면 GitHub Actions가 다음 순서로 진행합니다.
+`main` 브랜치에 push하면 `.github/workflows/deploy.yml`이 자동으로 실행됩니다. 수동 배포도 가능합니다.
+
+GitHub Pages 실행 방법:
+
+1. Settings -> Pages -> Source를 GitHub Actions로 설정합니다.
+2. Actions -> Deploy to GitHub Pages로 이동합니다.
+3. Run workflow 버튼을 눌러 수동 배포합니다.
+4. 배포 성공 후 아래 주소로 접속합니다.
+
+```text
+https://hanck0116.github.io/manrpg-pwa-ai/
+```
+
+workflow는 다음 순서로 실행됩니다.
 
 ```bash
 npm install
+npm run test
 npm run build
 ```
 
-빌드가 성공하면 `dist` 디렉터리가 GitHub Pages에 배포됩니다. 저장소의 Settings > Pages에서 Source를 GitHub Actions로 설정해 두면 됩니다.
+빌드가 성공하면 `dist` 디렉터리가 GitHub Pages artifact로 업로드되고 배포됩니다.
 
-배포 후 접속 주소:
+주의:
 
-```text
-https://sky88-1004.github.io/manrpg-pwa-ai/
-```
+- Pages 화면의 GitHub Pages Jekyll / Static HTML configure 버튼은 누르지 않습니다.
+- 이 프로젝트는 Vite 앱이므로 `deploy.yml`을 통해 배포합니다.
 
 ## 현재 구현된 기능
 
