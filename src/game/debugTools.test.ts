@@ -35,7 +35,9 @@ describe('debug tools', () => {
 
   it('grantTestRewards adds makeItem-based source items to inventory', () => {
     const next = grantTestRewards(baseState());
-    const expectedItems = ['외공서', '내공서', '검기', '기초 마법서', '기초 마법서 뽑기권', '스킬 초기화권'].map((name) => makeItem(name));
+    const expectedItems = ['외공서', '내공서', '검기', '기초 마법서', '기초 마법서 뽑기권', '기초 마법서 선택권', '중급 마법서 선택권', '스킬 초기화권'].map((name) =>
+      makeItem(name)
+    );
 
     expect(next.inventory.map((item) => item.name)).toEqual(expectedItems.map((item) => item.name));
     expect(next.inventory.map((item) => item.type)).toEqual(expectedItems.map((item) => item.type));

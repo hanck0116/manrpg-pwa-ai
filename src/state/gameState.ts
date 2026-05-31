@@ -100,6 +100,21 @@ export type RewardState = {
   claimed: boolean;
 };
 
+export type PendingChoiceOption = {
+  id: string;
+  label: string;
+  value: string;
+  meta?: Record<string, string | number>;
+};
+
+export type PendingChoice = {
+  id: string;
+  sourceItemId: string;
+  sourceItemName: string;
+  kind: 'magicTicketSelect' | 'choiceItem';
+  options: PendingChoiceOption[];
+};
+
 export type GameState = {
   setupMode: boolean;
   levelUpPending: boolean;
@@ -118,6 +133,7 @@ export type GameState = {
   spells: LearnedSpell[];
   battleResult?: BattleResult;
   pendingReaction?: PendingReaction;
+  pendingChoice?: PendingChoice;
 };
 
 export const createCharacter = (

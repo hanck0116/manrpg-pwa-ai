@@ -1,8 +1,19 @@
 import { calcDerivedStats } from '../rules/derivedStats';
-import { createInitialGameState, type Character, type CoreStats, type GameState, type LearnedSpell, type RewardItem, type RewardState } from '../state/gameState';
+import {
+  createInitialGameState,
+  type Character,
+  type CoreStats,
+  type GameState,
+  type LearnedSpell,
+  type PendingChoice,
+  type PendingChoiceOption,
+  type RewardItem,
+  type RewardState
+} from '../state/gameState';
 
-export const SAVE_KEY = 'manrpg-pwa-ai:save:v9';
+export const SAVE_KEY = 'manrpg-pwa-ai:save:v10';
 export const LEGACY_SAVE_KEYS = [
+  'manrpg-pwa-ai:save:v9',
   'manrpg-pwa-ai:save:v8',
   'manrpg-pwa-ai:save:v7',
   'manrpg-pwa-ai:save:v6',
@@ -12,7 +23,7 @@ export const LEGACY_SAVE_KEYS = [
   'manrpg-pwa-ai:save:v2',
   'manrpg-pwa-ai:save:v1'
 ];
-const SAVE_VERSION = 9;
+const SAVE_VERSION = 10;
 
 type SavePayload = {
   saveVersion: number;
@@ -153,6 +164,35 @@ const isValidPendingReaction = (value: unknown): boolean => {
   );
 };
 
+const isValidPendingChoiceOption = (value: unknown): value is PendingChoiceOption => {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.label === 'string' &&
+    typeof value.value === 'string' &&
+    (value.meta === undefined ||
+      (isObject(value.meta) && Object.values(value.meta).every((metaValue) => typeof metaValue === 'string' || isNumber(metaValue))))
+  );
+};
+
+const isValidPendingChoice = (value: unknown): value is PendingChoice => {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.sourceItemId === 'string' &&
+    typeof value.sourceItemName === 'string' &&
+    (value.kind === 'magicTicketSelect' || value.kind === 'choiceItem') &&
+    Array.isArray(value.options) &&
+    value.options.every(isValidPendingChoiceOption)
+  );
+};
+
 const isValidGameState = (value: unknown): value is GameState => {
   if (!isObject(value)) {
     return false;
@@ -177,7 +217,8 @@ const isValidGameState = (value: unknown): value is GameState => {
     Array.isArray(value.spells) &&
     value.spells.every(isValidLearnedSpell) &&
     (value.rewardState === undefined || isValidRewardState(value.rewardState)) &&
-    (value.pendingReaction === undefined || isValidPendingReaction(value.pendingReaction))
+    (value.pendingReaction === undefined || isValidPendingReaction(value.pendingReaction)) &&
+    (value.pendingChoice === undefined || isValidPendingChoice(value.pendingChoice))
   );
 };
 

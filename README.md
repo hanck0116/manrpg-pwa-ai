@@ -191,9 +191,9 @@ npm run build
   - 계단 미구현 표시
 - 전투 로그 최근 20개 표시
 - 저장/불러오기
-  - `saveVersion: 9`
-  - `floor`, `rewardState`, `inventory`, `spells`, `levelUpPending`, `pendingReaction`을 포함한 현재 구조만 유효 저장으로 취급
-  - saveVersion 9가 아니거나 깨진 저장 데이터는 초기 상태로 복구
+  - `saveVersion: 10`
+  - `floor`, `rewardState`, `inventory`, `spells`, `levelUpPending`, `pendingReaction`, `pendingChoice`를 포함한 현재 구조만 유효 저장으로 취급
+  - saveVersion 10이 아니거나 깨진 저장 데이터는 초기 상태로 복구
   - actionQueue와 `spellId`/`itemId`/`reactionType` 저장/복구
 - 접이식 AI 설정 패널 자리
 - Cloudflare Worker stub
@@ -266,8 +266,7 @@ npm run build
 ## 아직 미구현/TODO
 
 - 일반 판정의 상황별 성공조건 정리
-- magicTicket select 선택 UI
-- choice 선택권 UI
+- choice 선택권 실제 효과 구현
 - 스킬 실제 효과 구현
 - 장비 구현
 - 스킬 초기화권 실제 효과 구현
@@ -324,10 +323,13 @@ npm run build
 - 정비 단계 상점은 `src/rules/shop.ts`에 구현했으며 `floor-cleared`, `reward-pending`, `level-up-pending`, `battle-ended`에서만 사용할 수 있습니다.
 - 상점 상품명은 원본 한국어명으로 표시/생성합니다: 기초/중급/고급 마법서, 멀티캐스팅의 서, 외공서, 내공서, 검기, 기초 마법서 뽑기권, 스킬 초기화권.
 - `RewardItem.type`은 원본 `makeItem()` 확장을 위해 `magicTicket`, `choice`, `multiItem`을 포함합니다.
-- `magicBook`은 지혜 판정으로 습득하고 실패 시 유지됩니다. `magicTicket` random은 판정 없이 등급 범위 마법 1개를 지급하고 사용한 권을 제거합니다. `magicTicket` select와 `choice`는 선택 UI 구현 전까지 사용하지 않고 유지합니다.
+- `magicBook`은 지혜 판정으로 습득하고 실패 시 유지됩니다.
+- `magicTicket` random은 판정 없이 등급 범위 마법 1개를 지급하고 사용한 권을 제거합니다.
+- `magicTicket` select는 판정 없이 등급 범위 마법 목록을 선택 UI로 표시하고, 확정 시 선택한 마법을 지급한 뒤 사용한 권을 제거합니다.
+- `choice` 선택권은 1차 UI만 구현했습니다. 선택 결과는 로그로 기록하지만, 원본별 실제 효과는 창작하지 않고 인벤토리를 유지합니다.
 - 적의 인접 공격은 즉시 피해를 적용하지 않고 `player-reaction`으로 진입합니다. 회피/방어/카운터/반응 안 함은 행동 큐를 소모하지 않는 1차 구현입니다.
 - 플레이어의 방어 행동은 적의 다음 공격 1회 판정까지 유지되고, 공격/반응 처리 후 해제됩니다.
-- 저장 구조는 `saveVersion: 9`이며 `spellId`, `itemId`, `reactionType`, `pendingReaction`, `magicTicket`, `choice`, `multiItem`을 검증합니다.
+- 저장 구조는 `saveVersion: 10`이며 `spellId`, `itemId`, `reactionType`, `pendingReaction`, `pendingChoice`, `magicTicket`, `choice`, `multiItem`을 검증합니다.
 - Vitest 기반 `npm run test`를 추가했습니다.
 
 검증:

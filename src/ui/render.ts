@@ -1,4 +1,5 @@
 import { enqueueAction, removeQueuedAction } from '../game/actionQueue';
+import { cancelPendingChoice, confirmPendingChoice } from '../game/choiceFlow';
 import { clearFloorRecovery, enterNextFloor } from '../game/floor';
 import {
   clearSavedData,
@@ -433,6 +434,38 @@ const renderShopPanel = (state: GameState): string => {
   `;
 };
 
+const renderPendingChoicePanel = (state: GameState): string => {
+  if (!state.pendingChoice) {
+    return '';
+  }
+
+  const guidance =
+    state.pendingChoice.kind === 'magicTicketSelect'
+      ? '획득할 마법을 선택하세요.'
+      : '선택권 효과는 원본 규칙 확인 후 단계적으로 구현됩니다.';
+
+  return `
+    <section class="panel pending-choice-panel">
+      <h2>선택권 사용</h2>
+      <p><strong>${state.pendingChoice.sourceItemName}</strong></p>
+      <p class="muted">${guidance}</p>
+      <div class="choice-option-list">
+        ${state.pendingChoice.options
+          .map(
+            (option) => `
+              <div class="reward-row">
+                <span>${option.label}</span>
+                <button type="button" data-confirm-choice="${option.id}">선택</button>
+              </div>
+            `
+          )
+          .join('')}
+      </div>
+      <button type="button" data-cancel-choice>취소</button>
+    </section>
+  `;
+};
+
 const renderKnownSpells = (state: GameState): string => `
   <section class="panel spells-panel">
     <details>
@@ -595,6 +628,7 @@ const template = (state: GameState): string => `
     ${renderRewardPanel(state)}
     ${renderShopPanel(state)}
     ${renderInventorySummary(state)}
+    ${renderPendingChoicePanel(state)}
     ${renderKnownSpells(state)}
     ${renderBattleItems(state)}
     ${renderReactionPanel(state)}
@@ -640,6 +674,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const addSpellId = target.dataset.addSpell;
     const addBattleItemId = target.dataset.addBattleItem;
     const buyShopItemId = target.dataset.buyShopItem;
+    const confirmChoiceId = target.dataset.confirmChoice;
     const reaction = target.dataset.reaction as 'dodge' | 'guard' | 'counter' | 'none' | undefined;
     const debugAction = target.dataset.debugAction;
 
@@ -826,6 +861,16 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
 
     if (buyShopItemId) {
       setState(buyShopItem(getState(), buyShopItemId));
+      return;
+    }
+
+    if (confirmChoiceId) {
+      setState(confirmPendingChoice(getState(), confirmChoiceId));
+      return;
+    }
+
+    if (target.dataset.cancelChoice !== undefined) {
+      setState(cancelPendingChoice(getState()));
       return;
     }
 

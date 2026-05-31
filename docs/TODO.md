@@ -46,12 +46,14 @@
 - [x] 실험/디버그 패널
 - [x] TESTING.md 작성
 - [x] 모바일 실험 UI 정리
+- [x] magicTicket select 선택 UI
+- [x] choice 선택권 UI 1차
+- [x] saveVersion 10 반영
 
 ## 남은 TODO
 
 - [ ] Worker relay 구현
-- [ ] magicTicket select 선택 UI
-- [ ] choice 선택권 UI
+- [ ] choice 선택권 실제 효과 구현
 - [ ] 일반 판정의 상황별 성공조건 정리
 - [ ] 스킬 실제 효과 구현
 - [ ] 장비 구현

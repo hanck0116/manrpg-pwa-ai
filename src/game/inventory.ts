@@ -1,4 +1,4 @@
-import { rollSpellFromGrade, tryLearnMagicBook } from '../rules/spell';
+import { getMagicBookConfig, rollSpellFromGrade, SPELLS, tryLearnMagicBook } from '../rules/spell';
 import { appendLog, type GameState, type LearnedSpell, type RewardItem } from '../state/gameState';
 import { refreshPlayer, updatePlayerStats } from './characterUpdate';
 
@@ -20,6 +20,61 @@ const isOuterStackItem = (item: RewardItem): boolean => item.name === '외공서
 const isInnerStackItem = (item: RewardItem): boolean => item.name === '내공서' || item.name === 'Inner Stack Manual';
 const isSwordKiItem = (item: RewardItem): boolean => item.name === '검기' || item.name === 'Sword Ki Manual';
 const isMulticastingItem = (item: RewardItem): boolean => item.name === '멀티캐스팅의 서' || item.name === 'Multicasting Manual';
+
+const createChoiceId = (prefix: string): string => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+const createMagicTicketSelectChoice = (state: GameState, item: RewardItem): GameState => {
+  const grade = item.grade ?? '기초';
+  const config = getMagicBookConfig(grade);
+
+  return appendLog(
+    {
+      ...state,
+      pendingChoice: {
+        id: createChoiceId('magic-ticket-select'),
+        sourceItemId: item.id,
+        sourceItemName: item.name,
+        kind: 'magicTicketSelect',
+        options: config.circles.flatMap((circle) =>
+          SPELLS[circle].map((spellName) => ({
+            id: `spell-${circle}-${spellName}`,
+            label: `${spellName} / ${circle}서클`,
+            value: spellName,
+            meta: {
+              circle,
+              grade
+            }
+          }))
+        )
+      }
+    },
+    `${item.name}: 선택할 마법을 고르세요.`
+  );
+};
+
+const createChoiceItemChoice = (state: GameState, item: RewardItem): GameState => {
+  if (!item.choices || item.choices.length === 0) {
+    return appendLog(state, '이 선택권은 아직 선택지가 정의되지 않았습니다.');
+  }
+
+  return appendLog(
+    {
+      ...state,
+      pendingChoice: {
+        id: createChoiceId('choice-item'),
+        sourceItemId: item.id,
+        sourceItemName: item.name,
+        kind: 'choiceItem',
+        options: item.choices.map((choice, index) => ({
+          id: `choice-${index}-${choice}`,
+          label: choice,
+          value: choice
+        }))
+      }
+    },
+    `${item.name}: 선택지를 고르세요.`
+  );
+};
 
 export const removeInventoryItem = (state: GameState, itemId: string): GameState => {
   const item = findInventoryItem(state, itemId);
@@ -95,7 +150,7 @@ export const useInventoryItem = (state: GameState, itemId: string): GameState =>
 
   if (item.type === 'magicTicket') {
     if (item.mode === 'select') {
-      return appendLog(state, '마법서 선택권은 선택 UI 구현 후 사용할 수 있습니다.');
+      return createMagicTicketSelectChoice(state, item);
     }
 
     const spell = rollSpellFromGrade(item.grade ?? '기초');
@@ -117,7 +172,7 @@ export const useInventoryItem = (state: GameState, itemId: string): GameState =>
   }
 
   if (item.type === 'choice') {
-    return appendLog(state, `${item.name}은 선택지 UI 구현 후 사용할 수 있습니다.`);
+    return createChoiceItemChoice(state, item);
   }
 
   if (item.type === 'reset') {

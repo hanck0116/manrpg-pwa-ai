@@ -29,14 +29,16 @@ export const grantTestCoins = (state: GameState, amount = 50): GameState =>
   );
 
 export const grantTestRewards = (state: GameState): GameState => {
-  const items = ['외공서', '내공서', '검기', '기초 마법서', '기초 마법서 뽑기권', '스킬 초기화권'].map((name) => makeItem(name));
+  const items = ['외공서', '내공서', '검기', '기초 마법서', '기초 마법서 뽑기권', '기초 마법서 선택권', '중급 마법서 선택권', '스킬 초기화권'].map((name) =>
+    makeItem(name)
+  );
 
   return debugLog(
     {
       ...state,
       inventory: [...state.inventory, ...items]
     },
-    '원본 규칙 보상이 아니라 테스트 편의로 외공서, 내공서, 검기, 기초 마법서, 기초 마법서 뽑기권, 스킬 초기화권을 지급했습니다.'
+    '원본 규칙 보상이 아니라 테스트 편의로 외공서, 내공서, 검기, 기초 마법서, 기초 마법서 뽑기권, 기초/중급 마법서 선택권, 스킬 초기화권을 지급했습니다.'
   );
 };
 
