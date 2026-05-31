@@ -42,17 +42,21 @@
 - [x] magicTicket random 사용 1차 구현
 - [x] saveVersion 9 반영
 - [x] AI API 1차 구현: 브라우저 직접 BYOK 호출, 수동 GM 묘사/자연어 해석, fallback 유지
+- [x] GitHub Pages 배포 설정
+- [x] 실험/디버그 패널
+- [x] TESTING.md 작성
+- [x] 모바일 실험 UI 정리
 
 ## 남은 TODO
 
+- [ ] Worker relay 구현
+- [ ] magicTicket select 선택 UI
+- [ ] choice 선택권 UI
 - [ ] 일반 판정의 상황별 성공조건 정리
 - [ ] 스킬 실제 효과 구현
 - [ ] 장비 구현
 - [ ] 스킬 초기화권 실제 효과 구현
-- [ ] magicTicket select 선택 UI
-- [ ] choice 선택권 UI
 - [ ] 마법 특수 효과/상태이상 구현
 - [ ] 전투 중 실제 소모 아이템 추가
-- [ ] Worker relay 구현
 - [ ] UI 모바일 최종 정리
-- [ ] 배포 설정
+- [ ] 배포 후 버그 수정

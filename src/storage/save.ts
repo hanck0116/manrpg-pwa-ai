@@ -1,8 +1,8 @@
 import { calcDerivedStats } from '../rules/derivedStats';
 import { createInitialGameState, type Character, type CoreStats, type GameState, type LearnedSpell, type RewardItem, type RewardState } from '../state/gameState';
 
-const SAVE_KEY = 'manrpg-pwa-ai:save:v9';
-const LEGACY_SAVE_KEYS = [
+export const SAVE_KEY = 'manrpg-pwa-ai:save:v9';
+export const LEGACY_SAVE_KEYS = [
   'manrpg-pwa-ai:save:v8',
   'manrpg-pwa-ai:save:v7',
   'manrpg-pwa-ai:save:v6',
@@ -221,4 +221,11 @@ export const loadGameStub = (): GameState => {
   } catch {
     return createInitialGameState();
   }
+};
+
+export const clearSavedGame = (): string => {
+  localStorage.removeItem(SAVE_KEY);
+  LEGACY_SAVE_KEYS.forEach((key) => localStorage.removeItem(key));
+
+  return '저장 데이터를 초기화했습니다.';
 };

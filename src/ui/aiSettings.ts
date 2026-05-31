@@ -1,9 +1,17 @@
 import { getAISettings, hasProviderKey, type AIProvider } from '../ai/settings';
 
 let aiSettingsStatus = '';
+let lastConnectionResult = '아직 연결 테스트를 실행하지 않았습니다.';
+let lastFallbackStatus = '확인 전';
 
 export const setAISettingsStatus = (status: string): void => {
   aiSettingsStatus = status;
+};
+
+export const setAIConnectionStatus = (status: string, fallbackUsed: boolean): void => {
+  aiSettingsStatus = status;
+  lastConnectionResult = status;
+  lastFallbackStatus = fallbackUsed ? 'fallback 사용' : 'fallback 미사용';
 };
 
 const providerLabel: Record<AIProvider, string> = {
@@ -24,10 +32,17 @@ const keyPlaceholder = (provider: AIProvider): string => (hasProviderKey(provide
 
 export const renderAISettings = (): string => {
   const settings = getAISettings();
+  const savedKeyCount = (['groq', 'gemini', 'openrouter'] as AIProvider[]).filter((provider) => hasProviderKey(provider)).length;
 
   return `
   <details class="panel ai-settings">
     <summary>AI 설정</summary>
+    <div class="ai-status-list">
+      <span>현재 AI 사용 상태: <strong>${settings.enabled ? '사용' : '미사용'}</strong></span>
+      <span>저장된 키: <strong>${savedKeyCount > 0 ? `${savedKeyCount}개 있음` : '없음'}</strong></span>
+      <span>마지막 연결 테스트: <strong>${lastConnectionResult}</strong></span>
+      <span>fallback: <strong>${lastFallbackStatus}</strong></span>
+    </div>
     <div class="setting-grid">
       <label>
         AI 사용
@@ -82,6 +97,7 @@ export const renderAISettings = (): string => {
     </div>
     <details>
       <summary>자연어 행동 해석</summary>
+      <p class="muted">해석 결과는 참고용이며 자동 실행되지 않습니다.</p>
       <textarea data-ai-interpret-input rows="3" placeholder="행동을 자연어로 입력"></textarea>
       <button type="button" data-ai-interpret>해석하기</button>
     </details>

@@ -1,5 +1,15 @@
 import { enqueueAction, removeQueuedAction } from '../game/actionQueue';
 import { clearFloorRecovery, enterNextFloor } from '../game/floor';
+import {
+  clearSavedData,
+  exportStateJson,
+  fullRecoverPlayer,
+  grantTestCoins,
+  grantTestRewards,
+  grantTestSpell,
+  resetAllProgress,
+  setEnemyHpToOne
+} from '../game/debugTools';
 import { getBattleUsableItems, sellInventoryItem, useInventoryItem } from '../game/inventory';
 import { applyFiveLevelPlus, canFinishLevelAllocation, finishLevelAllocation } from '../game/levelUp';
 import { resolvePlayerReaction } from '../game/reactionFlow';
@@ -25,7 +35,7 @@ import {
 } from '../game/statAllocation';
 import type { Character, Direction, GameState, QueuedAction } from '../state/gameState';
 import { appendLog } from '../state/gameState';
-import { renderAISettings, setAISettingsStatus } from './aiSettings';
+import { renderAISettings, setAIConnectionStatus, setAISettingsStatus } from './aiSettings';
 
 const actionLabels: Record<QueuedAction['type'], string> = {
   move: '이동',
@@ -79,6 +89,8 @@ const appendAILogs = (state: GameState, narration: string, combatLog: string[] =
   const withNarration = narration ? appendLog(state, narration) : state;
   return combatLog.reduce((nextState, log) => appendLog(nextState, log), withNarration);
 };
+
+const toErrorMessage = (error: unknown): string => (error instanceof Error && error.message ? error.message : '알 수 없는 오류');
 
 const getInputValue = (root: HTMLElement, selector: string): string =>
   root.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)?.value.trim() ?? '';
@@ -265,11 +277,29 @@ const renderMap = (state: GameState): string => `
 const renderLog = (state: GameState): string => `
   <section class="panel log-panel">
     <h2>전투 로그</h2>
-    <button type="button" data-ai-narrate>AI 문사 생성</button>
+    <p class="muted">AI는 묘사만 생성하며 HP/MP/판정 결과를 바꾸지 않습니다.</p>
+    <button type="button" data-ai-narrate>AI GM 묘사 생성</button>
     <ol>
       ${state.log.slice(-20).map((entry) => `<li><span>턴 ${entry.turn}</span>${entry.message}</li>`).join('')}
     </ol>
   </section>
+`;
+
+const renderDebugPanel = (): string => `
+  <details class="panel debug-panel">
+    <summary>실험/디버그</summary>
+    <p class="muted">이 패널은 모바일 실험과 버그 재현을 위한 테스트 편의 기능입니다. 원본 규칙 보상이나 전투 판정이 아니며, 기본 전투 흐름에 자동 개입하지 않습니다.</p>
+    <div class="debug-grid">
+      <button type="button" data-debug-action="clear-save">저장 데이터 초기화</button>
+      <button type="button" data-debug-action="reset-all">새 캐릭터로 완전 초기화</button>
+      <button type="button" data-debug-action="copy-json">현재 상태 JSON 복사</button>
+      <button type="button" data-debug-action="coins">테스트용 코인 +50</button>
+      <button type="button" data-debug-action="rewards">테스트용 보상 아이템 지급</button>
+      <button type="button" data-debug-action="spell">테스트용 마법 지급</button>
+      <button type="button" data-debug-action="enemy-hp-one">적 HP 1로 만들기</button>
+      <button type="button" data-debug-action="recover">플레이어 HP/MP 최대 회복</button>
+    </div>
+  </details>
 `;
 
 const renderTurnStatus = (state: GameState): string => `
@@ -571,6 +601,7 @@ const template = (state: GameState): string => `
     ${renderActionQueue(state)}
     ${renderActionButtons(state)}
     ${renderAISettings()}
+    ${renderDebugPanel()}
     ${renderLog(state)}
   </main>
 `;
@@ -610,39 +641,111 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const addBattleItemId = target.dataset.addBattleItem;
     const buyShopItemId = target.dataset.buyShopItem;
     const reaction = target.dataset.reaction as 'dodge' | 'guard' | 'counter' | 'none' | undefined;
+    const debugAction = target.dataset.debugAction;
+
+    const logError = (error: unknown): void => {
+      setState(appendLog(getState(), `오류: ${toErrorMessage(error)}`));
+    };
+
+    if (debugAction) {
+      try {
+        if (debugAction === 'clear-save') {
+          clearSavedData();
+          setState(appendLog(getState(), '저장 데이터를 초기화했습니다.'));
+          return;
+        }
+
+        if (debugAction === 'reset-all') {
+          clearSavedData();
+          setState(resetAllProgress(getState()));
+          return;
+        }
+
+        if (debugAction === 'copy-json') {
+          await navigator.clipboard.writeText(exportStateJson(getState()));
+          setState(appendLog(getState(), '실험/디버그: 현재 상태 JSON을 클립보드에 복사했습니다.'));
+          return;
+        }
+
+        if (debugAction === 'coins') {
+          setState(grantTestCoins(getState()));
+          return;
+        }
+
+        if (debugAction === 'rewards') {
+          setState(grantTestRewards(getState()));
+          return;
+        }
+
+        if (debugAction === 'spell') {
+          setState(grantTestSpell(getState()));
+          return;
+        }
+
+        if (debugAction === 'enemy-hp-one') {
+          setState(setEnemyHpToOne(getState()));
+          return;
+        }
+
+        if (debugAction === 'recover') {
+          setState(fullRecoverPlayer(getState()));
+          return;
+        }
+      } catch (error) {
+        logError(error);
+        return;
+      }
+    }
 
     if (target.dataset.aiSaveSettings !== undefined) {
-      setAISettings(collectAISettings(root));
-      setAISettingsStatus('AI 설정을 저장했습니다.');
-      setState(appendLog(getState(), 'AI 설정을 저장했습니다.'));
+      try {
+        setAISettings(collectAISettings(root));
+        setAISettingsStatus('AI 설정을 저장했습니다.');
+        setState(appendLog(getState(), 'AI 설정을 저장했습니다.'));
+      } catch (error) {
+        logError(error);
+      }
       return;
     }
 
     if (target.dataset.aiClearKeys !== undefined) {
-      clearAIKeys();
-      setAISettingsStatus('API 키를 지웠습니다.');
-      setState(appendLog(getState(), 'AI API 키를 지웠습니다.'));
+      try {
+        clearAIKeys();
+        setAISettingsStatus('API 키를 지웠습니다.');
+        setState(appendLog(getState(), 'AI API 키를 지웠습니다.'));
+      } catch (error) {
+        logError(error);
+      }
       return;
     }
 
     if (target.dataset.aiTest !== undefined) {
-      setAISettings(collectAISettings(root));
-      const response = await callLLM('narrate', {
-        summary: 'AI 연결 테스트',
-        delta: { source: 'settings-panel' },
-        localResult: '규칙 상태 변경 없음'
-      });
-      const fallbackUsed = response.ui_tags.includes('fallback');
-      const message = fallbackUsed ? 'AI 연결 실패 또는 fallback 사용' : 'AI 연결 성공';
+      try {
+        setAISettings(collectAISettings(root));
+        const response = await callLLM('narrate', {
+          summary: 'AI 연결 테스트',
+          delta: { source: 'settings-panel' },
+          localResult: '규칙 상태 변경 없음'
+        });
+        const fallbackUsed = response.ui_tags.includes('fallback');
+        const message = fallbackUsed ? 'AI 연결 실패 또는 fallback 사용' : 'AI 연결 성공';
 
-      setAISettingsStatus(message);
-      setState(appendAILogs(appendLog(getState(), message), response.narration, response.combat_log));
+        setAIConnectionStatus(message, fallbackUsed);
+        setState(appendAILogs(appendLog(getState(), message), response.narration, response.combat_log));
+      } catch (error) {
+        setAIConnectionStatus('AI 연결 테스트 오류', true);
+        logError(error);
+      }
       return;
     }
 
     if (target.dataset.aiNarrate !== undefined) {
-      const response = await callLLM('narrate', buildNarrationPayload(getState()));
-      setState(appendAILogs(getState(), response.narration, response.combat_log));
+      try {
+        const response = await callLLM('narrate', buildNarrationPayload(getState()));
+        setState(appendAILogs(getState(), response.narration, response.combat_log));
+      } catch (error) {
+        logError(error);
+      }
       return;
     }
 
@@ -653,12 +756,16 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
         return;
       }
 
-      const response = await callLLM('interpret', {
-        summary: naturalAction,
-        delta: { phase: getState().phase, floor: getState().floor },
-        localResult: '행동 큐에 추가하지 않고 해석만 표시'
-      });
-      setState(appendAILogs(getState(), response.narration, response.combat_log));
+      try {
+        const response = await callLLM('interpret', {
+          summary: naturalAction,
+          delta: { phase: getState().phase, floor: getState().floor },
+          localResult: '행동 큐에 추가하지 않고 해석만 표시'
+        });
+        setState(appendAILogs(getState(), response.narration, response.combat_log));
+      } catch (error) {
+        logError(error);
+      }
       return;
     }
 
@@ -796,11 +903,19 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     }
 
     if (saveAction === 'save') {
-      setState(appendLog(getState(), saveGameStub(getState())));
+      try {
+        setState(appendLog(getState(), saveGameStub(getState())));
+      } catch (error) {
+        logError(error);
+      }
     }
 
     if (saveAction === 'load') {
-      setState(appendLog(loadGameStub(), '불러오기: localStorage에서 검증된 상태를 읽었습니다. 깨진 데이터면 초기 상태로 복구됩니다.'));
+      try {
+        setState(appendLog(loadGameStub(), '불러오기: localStorage에서 검증된 상태를 읽었습니다. 깨진 데이터면 초기 상태로 복구됩니다.'));
+      } catch (error) {
+        logError(error);
+      }
     }
   });
 };
