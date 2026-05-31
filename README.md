@@ -199,7 +199,7 @@ npm run build
 - 저장/불러오기
   - `saveVersion: 11`
   - `floor`, `rewardState`, `inventory`, `spells`, `levelUpPending`, `pendingReaction`, `pendingChoice`를 포함한 현재 구조만 유효 저장으로 취급
-  - saveVersion 11이 아니거나 깨진 저장 데이터는 초기 상태로 복구
+  - saveVersion 12가 아니거나 깨진 저장 데이터는 초기 상태로 복구
   - actionQueue와 `spellId`/`itemId`/`reactionType` 저장/복구
 - 접이식 AI 설정 패널
 - Cloudflare Worker relay 1차
@@ -274,7 +274,7 @@ npm run build
 - 일반 판정의 상황별 성공조건 정리
 - choice 선택권 실제 효과 구현
 - 스킬 계산식 원본 정밀화
-- 장비 구현
+- 장비 원본 목록/등급/가격 정밀화
 - 반응 스킬 실제 연결
 - 마법 특수 효과/상태이상 구현
 - 전투 중 실제 소모 아이템 추가
@@ -353,7 +353,7 @@ npm run build
 
 현재 스킬은 원본 통합본에서 확인한 "스킬 피해 배수를 최종 공격 피해에 곱한다"는 방향만 1차로 반영했습니다. 원본에서 세부 산식이 확정되지 않은 효과는 임의로 확장하지 않고 TODO로 남깁니다.
 
-- 보유 스킬 구조가 `GameState.skills`에 추가되었고 저장 구조는 `saveVersion: 11`입니다.
+- 보유 스킬 구조가 `GameState.skills`에 추가되었고 현재 저장 구조는 `saveVersion: 12`입니다.
 - 행동 큐의 스킬 행동은 `skillId`로 보유 스킬을 참조합니다.
 - 스킬 제작은 정비 단계(`floor-cleared`, `reward-pending`, `level-up-pending`, `battle-ended`)에서만 가능합니다.
 - 1차 피해 스킬은 외공/검기/마법/없음 계열의 기준값에 배율을 곱해 적 1명에게 적용합니다.
@@ -369,3 +369,23 @@ npm run build
 - 보스몹은 없습니다.
 - 맵은 항상 고정 7x7입니다.
 - AI/Worker는 HP, MP, 피해, 보상, 위치, 스탯, 스킬 효과 계산을 수행하지 않습니다.
+
+## 구현 완료: 장비 시스템 1차
+
+원본에는 `장비목록`과 장비/아이템 판매 흐름이 확인되지만, 슬롯형 장비의 확정 효과와 일반 보상/상점 등장 규칙은 아직 명확하지 않습니다. 그래서 이번 단계에서는 원본에 없는 효과를 만들지 않고, 보유/착용/해제/판매/파생 수치 반영 구조만 먼저 구현했습니다.
+
+- 저장 구조는 `saveVersion: 12`입니다.
+- `GameState.equipment`에 `weapon`, `armor`, `accessory` 슬롯을 저장합니다.
+- `RewardItem.equipment`로 인벤토리 장비 아이템을 표현합니다.
+- 장비 착용/해제는 정비 단계(`floor-cleared`, `reward-pending`, `level-up-pending`, `battle-ended`)에서만 가능합니다.
+- 같은 슬롯 장비를 다시 착용하면 기존 장비는 인벤토리로 돌아갑니다.
+- 해제한 장비는 인벤토리로 돌아가며, 이후 판매할 수 있습니다.
+- 장비 보너스는 현재 1차로 `derivedBonus.attack`, `maxHP`, `maxMP`, `mpRegen`만 반영합니다.
+- 착용 시 현재 HP/MP를 자동 회복하지 않고, 해제 시 최대 HP/MP를 넘는 현재 HP/MP만 clamp합니다.
+- 테스트용 장비는 디버그 패널에서만 지급되며 일반 보상/상점에는 추가하지 않았습니다.
+
+남은 TODO:
+
+- 원본 장비 목록/등급/가격 정밀화
+- 장비의 `statBonus`를 원본 규칙에 맞춰 파생 수치 계산 전 반영
+- 착용 중 장비 판매/교체 UX 정리

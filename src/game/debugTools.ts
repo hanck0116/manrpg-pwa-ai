@@ -1,4 +1,5 @@
 import { makeItem } from '../rules/reward';
+import { equipmentToRewardItem, getDefaultEquipmentItems } from '../rules/equipment';
 import { createPlayerSkill } from '../rules/skill';
 import { SPELLS } from '../rules/spell';
 import { clearSavedGame } from '../storage/save';
@@ -80,6 +81,15 @@ export const grantTestSkill = (state: GameState): GameState =>
       ]
     },
     '원본 규칙 진행이 아니라 테스트 편의로 기본 외공 공격 스킬을 지급했습니다.'
+  );
+
+export const grantTestEquipment = (state: GameState): GameState =>
+  debugLog(
+    {
+      ...state,
+      inventory: [...state.inventory, ...getDefaultEquipmentItems().map(equipmentToRewardItem)]
+    },
+    '원본 규칙 보상이 아니라 테스트 편의로 장비를 지급했습니다.'
   );
 
 export const setEnemyHpToOne = (state: GameState): GameState =>

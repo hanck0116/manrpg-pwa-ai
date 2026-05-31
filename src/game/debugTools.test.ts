@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { makeItem } from '../rules/reward';
 import { createInitialGameState, type GameState } from '../state/gameState';
 import { clearSavedGame, LEGACY_SAVE_KEYS, SAVE_KEY } from '../storage/save';
-import { exportStateJson, fullRecoverPlayer, grantTestCoins, grantTestRewards, grantTestSkill, setEnemyHpToOne } from './debugTools';
+import { exportStateJson, fullRecoverPlayer, grantTestCoins, grantTestEquipment, grantTestRewards, grantTestSkill, setEnemyHpToOne } from './debugTools';
 
 const baseState = (): GameState => ({
   ...createInitialGameState(),
@@ -52,6 +52,13 @@ describe('debug tools', () => {
 
     expect(next.skills).toHaveLength(1);
     expect(next.skills[0].name).toBe('테스트 외공 공격');
+  });
+
+  it('grantTestEquipment adds three debug equipment items', () => {
+    const next = grantTestEquipment(baseState());
+
+    expect(next.inventory).toHaveLength(3);
+    expect(next.inventory.every((item) => item.type === 'equipment' && item.equipment?.source === 'debug')).toBe(true);
   });
 
   it('fullRecoverPlayer restores player hp and mp to max', () => {

@@ -73,7 +73,19 @@ export type GameLogEntry = {
 export type RewardItem = {
   id: string;
   name: string;
-  type: 'coin' | 'martial' | 'magicBook' | 'magicTicket' | 'choice' | 'multiItem' | 'multi' | 'reset' | 'trait' | 'special' | 'item';
+  type:
+    | 'coin'
+    | 'martial'
+    | 'magicBook'
+    | 'magicTicket'
+    | 'choice'
+    | 'multiItem'
+    | 'multi'
+    | 'reset'
+    | 'trait'
+    | 'special'
+    | 'item'
+    | 'equipment';
   coin?: number;
   grade?: string;
   sell?: number;
@@ -83,6 +95,7 @@ export type RewardItem = {
   choices?: string[];
   itemName?: string;
   count?: number;
+  equipment?: EquipmentItem;
 };
 
 export type LearnedSpell = {
@@ -109,6 +122,27 @@ export type PlayerSkill = {
   effectType: 'damage' | 'heal' | 'guard' | 'todo';
   source?: string;
 };
+
+export type EquipmentSlot = 'weapon' | 'armor' | 'accessory';
+export type EquipmentStatKey = 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'appearance';
+
+export type EquipmentItem = {
+  id: string;
+  name: string;
+  slot: EquipmentSlot;
+  grade?: string;
+  statBonus?: Partial<Record<EquipmentStatKey, number>>;
+  derivedBonus?: {
+    attack?: number;
+    maxHP?: number;
+    maxMP?: number;
+    mpRegen?: number;
+  };
+  sell?: number;
+  source?: string;
+};
+
+export type EquipmentLoadout = Partial<Record<EquipmentSlot, EquipmentItem>>;
 
 export type RewardState = {
   offered: RewardItem[];
@@ -150,6 +184,7 @@ export type GameState = {
   inventory: RewardItem[];
   spells: LearnedSpell[];
   skills: PlayerSkill[];
+  equipment: EquipmentLoadout;
   battleResult?: BattleResult;
   pendingReaction?: PendingReaction;
   pendingChoice?: PendingChoice;
@@ -241,7 +276,8 @@ export const createInitialGameState = (): GameState => {
     rewardState: undefined,
     inventory: [],
     spells: [],
-    skills: []
+    skills: [],
+    equipment: {}
   };
 };
 

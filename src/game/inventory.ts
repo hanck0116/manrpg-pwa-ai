@@ -1,6 +1,7 @@
 import { getMagicBookConfig, rollSpellFromGrade, SPELLS, tryLearnMagicBook } from '../rules/spell';
 import { appendLog, type GameState, type LearnedSpell, type RewardItem } from '../state/gameState';
 import { refreshPlayer, updatePlayerStats } from './characterUpdate';
+import { equipItem } from './equipment';
 
 const maintenancePhases: GameState['phase'][] = ['reward-pending', 'level-up-pending', 'floor-cleared', 'battle-ended'];
 
@@ -95,6 +96,10 @@ export const useInventoryItem = (state: GameState, itemId: string): GameState =>
 
   if (!item) {
     return appendLog(state, '인벤토리에서 해당 아이템을 찾을 수 없습니다.');
+  }
+
+  if (item.equipment) {
+    return equipItem(state, itemId);
   }
 
   if (isOuterStackItem(item)) {

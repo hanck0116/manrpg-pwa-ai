@@ -6,12 +6,14 @@ import {
   exportStateJson,
   fullRecoverPlayer,
   grantTestCoins,
+  grantTestEquipment,
   grantTestRewards,
   grantTestSkill,
   grantTestSpell,
   resetAllProgress,
   setEnemyHpToOne
 } from '../game/debugTools';
+import { unequipItem } from '../game/equipment';
 import { getBattleUsableItems, sellInventoryItem, useInventoryItem } from '../game/inventory';
 import { applyFiveLevelPlus, canFinishLevelAllocation, finishLevelAllocation } from '../game/levelUp';
 import { resolvePlayerReaction } from '../game/reactionFlow';
@@ -27,6 +29,7 @@ import { callLLM } from '../ai/router';
 import { setAISettings, clearAIKeys, getAISettings, type AIProvider, type AISettings } from '../ai/settings';
 import { clearAIUsage } from '../ai/usage';
 import { addPlayerSkill } from '../game/skillBook';
+import { getEquipmentLabel } from '../rules/equipment';
 import {
   allocatableStatKeys,
   canDecreaseStat,
@@ -37,7 +40,7 @@ import {
   resetStats,
   type AllocatableStatKey
 } from '../game/statAllocation';
-import type { Character, Direction, GameState, QueuedAction } from '../state/gameState';
+import type { Character, Direction, EquipmentSlot, GameState, QueuedAction } from '../state/gameState';
 import { appendLog } from '../state/gameState';
 import { renderAISettings, setAIConnectionStatus, setAISettingsStatus } from './aiSettings';
 
@@ -310,6 +313,7 @@ const renderDebugPanel = (): string => `
       <button type="button" data-debug-action="rewards">테스트용 보상 아이템 지급</button>
       <button type="button" data-debug-action="spell">테스트용 마법 지급</button>
       <button type="button" data-debug-action="skill">테스트용 스킬 지급</button>
+      <button type="button" data-debug-action="equipment">테스트용 장비 지급</button>
       <button type="button" data-debug-action="enemy-hp-one">적 HP 1로 만들기</button>
       <button type="button" data-debug-action="recover">플레이어 HP/MP 최대 회복</button>
     </div>
@@ -396,7 +400,7 @@ const renderInventorySummary = (state: GameState): string => {
     <section class="panel inventory-panel">
       <details>
         <summary>정비용 인벤토리 (${state.inventory.length})</summary>
-        <p class="muted">아이템 사용/판매는 정비 단계에서만 가능합니다. 전투 중 아이템 행동과는 아직 연결하지 않습니다.</p>
+        <p class="muted">아이템 사용/판매와 장비 착용은 정비 단계에서만 가능합니다. 전투 중 장비 변경은 불가능합니다.</p>
         ${
           state.inventory.length === 0
             ? '<p class="muted">보유 아이템이 없습니다.</p>'
@@ -404,9 +408,9 @@ const renderInventorySummary = (state: GameState): string => {
                 .map(
                   (item) => `
                     <li>
-                      <span>${item.name}${item.grade ? ` / ${item.grade}` : ''} · 판매가 ${item.sell ?? 0}코인</span>
+                      <span>${item.equipment ? getEquipmentLabel(item.equipment) : `${item.name}${item.grade ? ` / ${item.grade}` : ''}`} · 판매가 ${item.sell ?? 0}코인</span>
                       <span class="inline-actions">
-                        <button type="button" data-use-item="${item.id}" ${maintenanceDisabled}>사용</button>
+                        <button type="button" data-use-item="${item.id}" ${maintenanceDisabled}>${item.equipment ? '착용' : '사용'}</button>
                         <button type="button" data-sell-item="${item.id}" ${maintenanceDisabled}>판매</button>
                       </span>
                     </li>
@@ -414,6 +418,37 @@ const renderInventorySummary = (state: GameState): string => {
                 )
                 .join('')}</ul>`
         }
+      </details>
+    </section>
+  `;
+};
+
+const renderEquipmentPanel = (state: GameState): string => {
+  const maintenanceDisabled = ['reward-pending', 'level-up-pending', 'floor-cleared', 'battle-ended'].includes(state.phase) ? '' : 'disabled';
+  const slots: { slot: EquipmentSlot; label: string }[] = [
+    { slot: 'weapon', label: '무기' },
+    { slot: 'armor', label: '방어구' },
+    { slot: 'accessory', label: '장신구' }
+  ];
+
+  return `
+    <section class="panel equipment-panel">
+      <details>
+        <summary>장비</summary>
+        <p class="muted">장비 착용/해제는 정비 단계에서만 가능합니다. 테스트용 장비는 디버그 편의 기능입니다.</p>
+        <ul class="inventory-list">
+          ${slots
+            .map(({ slot, label }) => {
+              const item = state.equipment[slot];
+              return `
+                <li>
+                  <span>${label}: ${item ? getEquipmentLabel(item) : '비어 있음'}</span>
+                  <button type="button" data-unequip-slot="${slot}" ${item && !maintenanceDisabled ? '' : 'disabled'}>해제</button>
+                </li>
+              `;
+            })
+            .join('')}
+        </ul>
       </details>
     </section>
   `;
@@ -692,6 +727,7 @@ const template = (state: GameState): string => `
     ${renderFloorClearPanel(state)}
     ${renderRewardPanel(state)}
     ${renderShopPanel(state)}
+    ${renderEquipmentPanel(state)}
     ${renderInventorySummary(state)}
     ${renderPendingChoicePanel(state)}
     ${renderKnownSpells(state)}
@@ -737,6 +773,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const rewardId = target.dataset.toggleReward;
     const useItemId = target.dataset.useItem;
     const sellItemId = target.dataset.sellItem;
+    const unequipSlot = target.dataset.unequipSlot as EquipmentSlot | undefined;
     const addSpellId = target.dataset.addSpell;
     const addSkillId = target.dataset.addSkill;
     const addBattleItemId = target.dataset.addBattleItem;
@@ -786,6 +823,11 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
 
         if (debugAction === 'skill') {
           setState(grantTestSkill(getState()));
+          return;
+        }
+
+        if (debugAction === 'equipment') {
+          setState(grantTestEquipment(getState()));
           return;
         }
 
@@ -973,6 +1015,11 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
 
     if (sellItemId) {
       setState(sellInventoryItem(getState(), sellItemId));
+      return;
+    }
+
+    if (unequipSlot) {
+      setState(unequipItem(getState(), unequipSlot));
       return;
     }
 
