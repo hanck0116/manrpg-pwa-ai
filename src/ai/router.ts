@@ -61,18 +61,21 @@ export const callLLM = async (task: LLMTask, payload: LLMPayload): Promise<LLMRe
     if (settings.useProxy && settings.proxyUrl.trim()) {
       try {
         const response = await callViaProxy(provider, task, payload, settings);
+        const responseProvider = response.meta?.provider === 'groq' || response.meta?.provider === 'gemini' || response.meta?.provider === 'openrouter' ? response.meta.provider : provider;
+        const responseVia = response.meta?.via === 'worker' || response.meta?.via === 'proxy' || response.meta?.via === 'direct' ? response.meta.via : 'proxy';
+        const responseFallback = response.meta?.fallback ?? response.ui_tags.includes('fallback');
         const normalized = {
           narration: response.narration,
           combat_log: response.combat_log,
-          ui_tags: [...response.ui_tags, `provider:${provider}`, 'proxy'],
+          ui_tags: [...response.ui_tags, `provider:${responseProvider}`, 'proxy'],
           meta: {
             ...response.meta,
-            provider,
-            via: 'proxy' as const,
-            fallback: response.meta?.fallback ?? response.ui_tags.includes('fallback')
+            provider: responseProvider,
+            via: responseVia,
+            fallback: responseFallback
           }
         };
-        recordUsage(task, provider, normalized.meta.fallback ? 'fallback' : 'proxy', normalized.meta.fallback ?? false, response.meta?.estimatedInputChars ?? inputChars, normalized);
+        recordUsage(task, responseProvider, normalized.meta.fallback ? 'fallback' : 'proxy', normalized.meta.fallback ?? false, response.meta?.estimatedInputChars ?? inputChars, normalized);
         return normalized;
       } catch {
         // Proxy/provider failures are intentionally silent and fall through.

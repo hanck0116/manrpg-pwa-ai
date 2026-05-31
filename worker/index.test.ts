@@ -113,6 +113,8 @@ describe('worker relay', () => {
       fallback: false,
       attemptedProviders: ['groq']
     });
+    expect(data.meta?.estimatedInputChars).toBe('safe short prompt'.length);
+    expect(data.meta?.estimatedOutputChars).toBe('테스트 묘사로그'.length);
 
     vi.unstubAllGlobals();
   });
@@ -129,11 +131,13 @@ describe('worker relay', () => {
       }),
       {}
     );
-    const data = (await response.json()) as { meta?: { fallback?: boolean; attemptedProviders?: string[]; errorCode?: string } };
+    const data = (await response.json()) as LLMResponse;
 
     expect(data.meta?.fallback).toBe(true);
     expect(data.meta?.attemptedProviders).toEqual(['groq', 'openrouter', 'gemini']);
     expect(data.meta?.errorCode).toBe('missing-key');
+    expect(data.meta?.provider).toBe('gemini');
+    expect(data.meta?.via).toBe('worker');
   });
 
   it('classifies provider status errors safely', async () => {
@@ -142,6 +146,37 @@ describe('worker relay', () => {
     expect(classifyProviderError(new Error('x'), 401)).toBe('provider-401');
     expect(classifyProviderError(new Error('x'), 429)).toBe('provider-429');
     expect(classifyProviderError(new Error('x'), 500)).toBe('provider-5xx');
+    expect(classifyProviderError(new Error('missing-key'))).toBe('missing-key');
+    expect(classifyProviderError(new DOMException('aborted', 'AbortError'))).toBe('timeout');
+    expect(classifyProviderError(new TypeError('fetch failed'))).toBe('network');
+    expect(classifyProviderError(new Error('invalid-request'))).toBe('invalid-request');
+  });
+
+  it('returns safe errorCode values for 429 and 5xx provider failures', async () => {
+    for (const [status, errorCode] of [
+      [429, 'provider-429'],
+      [503, 'provider-5xx']
+    ] as const) {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response('provider body should not leak', { status })));
+      const response = await worker.fetch(
+        new Request('https://worker.test/llm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            task: 'narrate',
+            provider: 'groq',
+            prompt: 'safe short prompt'
+          })
+        }),
+        { GROQ_API_KEY: 'secret-groq-key' }
+      );
+      const text = await response.text();
+
+      expect(text).toContain(errorCode);
+      expect(text).not.toContain('secret-groq-key');
+      expect(text).not.toContain('provider body should not leak');
+      vi.unstubAllGlobals();
+    }
   });
 
   it('does not include API key strings in provider failure responses', async () => {
@@ -164,5 +199,25 @@ describe('worker relay', () => {
     expect(text).toContain('provider-401');
 
     vi.unstubAllGlobals();
+  });
+
+  it('does not echo a long prompt in fallback responses', async () => {
+    const longPrompt = `unique-prompt-${'x'.repeat(200)}`;
+    const response = await worker.fetch(
+      new Request('https://worker.test/llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task: 'narrate',
+          provider: 'groq',
+          prompt: longPrompt
+        })
+      }),
+      {}
+    );
+    const text = await response.text();
+
+    expect(text).not.toContain(longPrompt);
+    expect(text).toContain(`"estimatedInputChars":${longPrompt.length}`);
   });
 });

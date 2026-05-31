@@ -56,6 +56,9 @@
 - [x] Worker health 확인 UI
 - [x] AI 사용량/비용 추정 UI
 - [x] worker:check CI 연결
+- [x] Worker safe meta/errorCode 응답
+- [x] fallback 원인 표시
+- [x] Worker meta 테스트 보강
 
 ## 남은 TODO
 

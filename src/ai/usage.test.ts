@@ -65,7 +65,7 @@ describe('AI usage', () => {
     expect(getAIUsageEntries()).toHaveLength(0);
   });
 
-  it('does not store prompt text or API keys', async () => {
+  it('does not store prompt text, response text, or API keys', async () => {
     const { getAIUsageEntries, recordAIUsage } = await import('./usage');
 
     recordAIUsage({
@@ -78,6 +78,45 @@ describe('AI usage', () => {
     });
 
     expect(JSON.stringify(getAIUsageEntries())).not.toContain('secret prompt');
+    expect(JSON.stringify(getAIUsageEntries())).not.toContain('secret response');
     expect(JSON.stringify(getAIUsageEntries())).not.toContain('secret-api-key');
+  });
+
+  it('stores fallback entries with fallback true', async () => {
+    const { getAIUsageEntries, recordAIUsage } = await import('./usage');
+
+    recordAIUsage({
+      task: 'narrate',
+      provider: 'unknown',
+      via: 'fallback',
+      fallback: true,
+      inputChars: 12,
+      outputChars: 8
+    });
+
+    expect(getAIUsageEntries()[0]).toMatchObject({ provider: 'unknown', via: 'fallback', fallback: true });
+  });
+
+  it('summarizes provider attempts and successes', async () => {
+    const { getAIUsageSummary, recordAIUsage } = await import('./usage');
+
+    recordAIUsage({
+      task: 'narrate',
+      provider: 'groq',
+      via: 'direct',
+      fallback: false,
+      inputChars: 12,
+      outputChars: 8
+    });
+    recordAIUsage({
+      task: 'narrate',
+      provider: 'groq',
+      via: 'fallback',
+      fallback: true,
+      inputChars: 12,
+      outputChars: 8
+    });
+
+    expect(getAIUsageSummary().providerCounts.groq).toEqual({ attempts: 2, successes: 1 });
   });
 });

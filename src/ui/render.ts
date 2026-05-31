@@ -808,11 +808,11 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
           delta: { source: 'settings-panel' },
           localResult: '규칙 상태 변경 없음'
         });
-        const fallbackUsed = response.ui_tags.includes('fallback');
+        const fallbackUsed = response.meta?.fallback ?? response.ui_tags.includes('fallback');
         const message = fallbackUsed ? 'AI 연결 실패 또는 fallback 사용' : 'AI 연결 성공';
 
-        setAIConnectionStatus(message, fallbackUsed);
-        setState(appendAILogs(appendLog(getState(), message), response.narration, response.combat_log));
+        setAIConnectionStatus(message, fallbackUsed, response.meta);
+        setState(appendAILogs(appendLog(getState(), response.meta?.errorCode ? `${message}: ${response.meta.errorCode}` : message), response.narration, response.combat_log));
       } catch (error) {
         setAIConnectionStatus('AI 연결 테스트 오류', true);
         logError(error);
@@ -823,6 +823,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     if (target.dataset.aiNarrate !== undefined) {
       try {
         const response = await callLLM('narrate', buildNarrationPayload(getState()));
+        setAIConnectionStatus(response.meta?.fallback ? 'AI 연결 실패 또는 fallback 사용' : 'AI GM 묘사 생성 완료', response.meta?.fallback ?? response.ui_tags.includes('fallback'), response.meta);
         setState(appendAILogs(getState(), response.narration, response.combat_log));
       } catch (error) {
         logError(error);
@@ -843,6 +844,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
           delta: { phase: getState().phase, floor: getState().floor },
           localResult: '행동 큐에 추가하지 않고 해석만 표시'
         });
+        setAIConnectionStatus(response.meta?.fallback ? 'AI 연결 실패 또는 fallback 사용' : 'AI 자연어 해석 완료', response.meta?.fallback ?? response.ui_tags.includes('fallback'), response.meta);
         setState(appendAILogs(getState(), response.narration, response.combat_log));
       } catch (error) {
         logError(error);

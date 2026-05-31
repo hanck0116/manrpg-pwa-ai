@@ -1,18 +1,22 @@
 import { getAISettings, hasProviderKey, type AIProvider } from '../ai/settings';
+import type { LLMResponse } from '../ai/types';
 import { getAIUsageSummary } from '../ai/usage';
 
 let aiSettingsStatus = '';
 let lastConnectionResult = '아직 연결 테스트를 실행하지 않았습니다.';
 let lastFallbackStatus = '확인 전';
+let lastMetaSummary = '아직 응답 meta가 없습니다.';
 
 export const setAISettingsStatus = (status: string): void => {
   aiSettingsStatus = status;
 };
 
-export const setAIConnectionStatus = (status: string, fallbackUsed: boolean): void => {
-  aiSettingsStatus = status;
+export const setAIConnectionStatus = (status: string, fallbackUsed: boolean, meta?: LLMResponse['meta']): void => {
+  const errorSuffix = meta?.errorCode ? `: ${meta.errorCode}` : '';
+  aiSettingsStatus = `${status}${errorSuffix}`;
   lastConnectionResult = status;
   lastFallbackStatus = fallbackUsed ? 'fallback 사용' : 'fallback 미사용';
+  lastMetaSummary = `provider=${meta?.provider ?? 'unknown'}, via=${meta?.via ?? 'unknown'}, fallback=${meta?.fallback ?? fallbackUsed}, errorCode=${meta?.errorCode ?? 'none'}`;
 };
 
 const providerLabel: Record<AIProvider, string> = {
@@ -48,6 +52,7 @@ export const renderAISettings = (): string => {
       <span>마지막 연결 테스트: <strong>${lastConnectionResult}</strong></span>
       <span>fallback: <strong>${lastFallbackStatus}</strong></span>
     </div>
+    <p class="muted">마지막 meta: ${lastMetaSummary}</p>
     <div class="ai-status-list">
       <span>오늘 요청: <strong>${usage.todayRequests}</strong></span>
       <span>최근 요청: <strong>${usage.totalRequests}</strong></span>

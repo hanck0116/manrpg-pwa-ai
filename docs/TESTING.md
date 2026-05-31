@@ -99,10 +99,13 @@ https://hanck0116.github.io/manrpg-pwa-ai/
 4. Worker 상태 확인 버튼을 눌러 service, version, provider true/false 표시를 확인합니다.
 5. 연결 테스트를 눌러 프록시 연결 결과와 fallback 상태를 확인합니다.
 6. 같은 Provider/API 키로 Direct BYOK와 Worker Proxy를 각각 테스트합니다.
-7. provider 키가 없을 때 fallback이 표시되는지 확인합니다.
-8. AI 사용량 요약의 요청 수와 fallback 횟수가 증가하는지 확인합니다.
-9. AI 사용량 초기화 버튼으로 기록이 초기화되는지 확인합니다.
-10. 실패해도 게임 진행이 멈추지 않고 fallback 로그가 남는지 확인합니다.
+7. provider 키가 없을 때 `missing-key` 또는 fallback이 표시되는지 확인합니다.
+8. 잘못된 키를 넣었을 때 `provider-401` 또는 `provider-403`이 표시되는지 확인합니다.
+9. 너무 많은 요청 또는 한도 초과 상황에서는 `provider-429`가 표시되는지 확인합니다.
+10. Worker 사용 시에도 게임 HP/MP/피해/보상/위치가 AI 응답으로 바뀌지 않는지 확인합니다.
+11. AI 사용량 요약의 요청 수와 fallback 횟수가 증가하는지 확인합니다.
+12. AI 사용량 초기화 버튼으로 기록이 초기화되는지 확인합니다.
+13. 실패해도 게임 진행이 멈추지 않고 fallback 로그가 남는지 확인합니다.
 
 ## 17. 저장/불러오기 테스트
 

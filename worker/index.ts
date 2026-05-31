@@ -90,6 +90,7 @@ export const classifyProviderError = (error: unknown, responseStatus?: number): 
   if (responseStatus === 429) return 'provider-429';
   if (responseStatus !== undefined && responseStatus >= 500) return 'provider-5xx';
   if (error instanceof Error && error.message === 'missing-key') return 'missing-key';
+  if (error instanceof Error && error.message === 'invalid-request') return 'invalid-request';
   if (error instanceof DOMException && error.name === 'AbortError') return 'timeout';
   if (error instanceof Error && error.name === 'AbortError') return 'timeout';
   if (error instanceof TypeError) return 'network';
@@ -248,10 +249,12 @@ const handleLlm = async (request: Request, env: Env): Promise<Response> => {
 
   const providers = parsed.provider ? [parsed.provider, ...defaultPriority[parsed.task].filter((provider) => provider !== parsed.provider)] : defaultPriority[parsed.task];
   const attemptedProviders: string[] = [];
+  let lastProvider: ProviderName | undefined;
   let lastErrorCode: NonNullable<LLMResponse['meta']>['errorCode'] | undefined;
 
   for (const provider of providers) {
     attemptedProviders.push(provider);
+    lastProvider = provider;
     try {
       const response = await callProvider(provider, parsed, env);
       return jsonResponse(
@@ -283,6 +286,9 @@ const handleLlm = async (request: Request, env: Env): Promise<Response> => {
       ...fallbackResponse,
       meta: {
         ...fallbackResponse.meta,
+        provider: lastProvider,
+        via: 'worker',
+        fallback: true,
         attemptedProviders,
         errorCode: lastErrorCode,
         estimatedInputChars: parsed.prompt.length,
