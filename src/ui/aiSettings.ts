@@ -1,4 +1,5 @@
 import { getAISettings, hasProviderKey, type AIProvider } from '../ai/settings';
+import { getAIUsageSummary } from '../ai/usage';
 
 let aiSettingsStatus = '';
 let lastConnectionResult = '아직 연결 테스트를 실행하지 않았습니다.';
@@ -33,6 +34,10 @@ const keyPlaceholder = (provider: AIProvider): string => (hasProviderKey(provide
 export const renderAISettings = (): string => {
   const settings = getAISettings();
   const savedKeyCount = (['groq', 'gemini', 'openrouter'] as AIProvider[]).filter((provider) => hasProviderKey(provider)).length;
+  const usage = getAIUsageSummary();
+  const providerSummary = Object.entries(usage.providerCounts)
+    .map(([provider, summary]) => `${provider}: ${summary.attempts}회/${summary.successes}성공`)
+    .join(' · ');
 
   return `
   <details class="panel ai-settings">
@@ -43,6 +48,14 @@ export const renderAISettings = (): string => {
       <span>마지막 연결 테스트: <strong>${lastConnectionResult}</strong></span>
       <span>fallback: <strong>${lastFallbackStatus}</strong></span>
     </div>
+    <div class="ai-status-list">
+      <span>오늘 요청: <strong>${usage.todayRequests}</strong></span>
+      <span>최근 요청: <strong>${usage.totalRequests}</strong></span>
+      <span>fallback 횟수: <strong>${usage.fallbackCount}</strong></span>
+      <span>추정 비용: <strong>$${usage.estimatedCostUsd.toFixed(6)}</strong></span>
+    </div>
+    <p class="muted">Provider 요약: ${providerSummary || '기록 없음'}</p>
+    <p class="muted">비용은 문자 수 기반 대략 추정이며 실제 청구액과 다를 수 있습니다.</p>
     <div class="setting-grid">
       <label>
         AI 사용
@@ -101,6 +114,8 @@ export const renderAISettings = (): string => {
         <button type="button" data-ai-save-settings>설정 저장</button>
         <button type="button" data-ai-clear-keys>API 키 지우기</button>
         <button type="button" data-ai-test>연결 테스트</button>
+        <button type="button" data-ai-worker-health>Worker 상태 확인</button>
+        <button type="button" data-ai-clear-usage>AI 사용량 초기화</button>
       </div>
       <p class="muted" data-ai-status>${aiSettingsStatus}</p>
     </div>

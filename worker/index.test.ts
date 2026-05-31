@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { LLMResponse } from '../src/ai/types';
 import worker from './index';
 
 describe('worker relay', () => {
@@ -99,13 +100,68 @@ describe('worker relay', () => {
       }),
       { GROQ_API_KEY: 'secret-groq-key' }
     );
-    const data = (await response.json()) as { narration: string; combat_log: string[]; ui_tags: string[] };
+    const data = (await response.json()) as LLMResponse;
 
     expect(data).toMatchObject({
       narration: '테스트 묘사',
       combat_log: ['로그']
     });
     expect(data.ui_tags).toContain('provider:groq');
+    expect(data.meta).toMatchObject({
+      provider: 'groq',
+      via: 'worker',
+      fallback: false,
+      attemptedProviders: ['groq']
+    });
+
+    vi.unstubAllGlobals();
+  });
+
+  it('returns fallback meta when all providers fail', async () => {
+    const response = await worker.fetch(
+      new Request('https://worker.test/llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task: 'narrate',
+          prompt: 'safe short prompt'
+        })
+      }),
+      {}
+    );
+    const data = (await response.json()) as { meta?: { fallback?: boolean; attemptedProviders?: string[]; errorCode?: string } };
+
+    expect(data.meta?.fallback).toBe(true);
+    expect(data.meta?.attemptedProviders).toEqual(['groq', 'openrouter', 'gemini']);
+    expect(data.meta?.errorCode).toBe('missing-key');
+  });
+
+  it('classifies provider status errors safely', async () => {
+    const { classifyProviderError } = await import('./index');
+
+    expect(classifyProviderError(new Error('x'), 401)).toBe('provider-401');
+    expect(classifyProviderError(new Error('x'), 429)).toBe('provider-429');
+    expect(classifyProviderError(new Error('x'), 500)).toBe('provider-5xx');
+  });
+
+  it('does not include API key strings in provider failure responses', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('unauthorized', { status: 401 })));
+    const response = await worker.fetch(
+      new Request('https://worker.test/llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task: 'narrate',
+          provider: 'groq',
+          prompt: 'safe short prompt'
+        })
+      }),
+      { GROQ_API_KEY: 'secret-groq-key' }
+    );
+    const text = await response.text();
+
+    expect(text).not.toContain('secret-groq-key');
+    expect(text).toContain('provider-401');
 
     vi.unstubAllGlobals();
   });

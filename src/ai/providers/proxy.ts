@@ -19,7 +19,8 @@ const normalizeProxyResponse = (value: unknown): LLMResponse => {
     return {
       narration: typeof response.narration === 'string' ? response.narration : '',
       combat_log: Array.isArray(response.combat_log) ? response.combat_log.filter((entry): entry is string => typeof entry === 'string') : [],
-      ui_tags: Array.isArray(response.ui_tags) ? response.ui_tags.filter((entry): entry is string => typeof entry === 'string') : []
+      ui_tags: Array.isArray(response.ui_tags) ? response.ui_tags.filter((entry): entry is string => typeof entry === 'string') : [],
+      meta: typeof response.meta === 'object' && response.meta !== null ? response.meta : undefined
     };
   }
 

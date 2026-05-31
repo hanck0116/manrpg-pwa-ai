@@ -12,6 +12,8 @@ ManRPG를 **실행 가능한 PWA 기본 골격 + 로컬 규칙 엔진 + 고정 7
 - 브라우저 직접 BYOK 방식으로 Groq/Gemini/OpenRouter를 호출할 수 있음
 - AI API 1차 구현 완료: AI 묘사 생성과 자연어 행동 해석 UI 제공
 - AI 사용 방식은 Direct BYOK와 Worker Proxy 모드를 지원
+- Worker relay 1차와 운영 안정화 1차 완료: `/health`, 안전한 meta, provider fallback, Worker 상태 확인 UI 지원
+- AI 사용량/비용 추정 UI 제공. 비용은 문자 수 기반 대략값이며 실제 청구액과 다를 수 있음
 - Worker는 규칙 판정 서버가 아니라 LLM relay이며, API 실패 시 fallback으로 게임 진행 유지
 - API 키는 기본적으로 메모리에만 보관하며, 사용자가 “이 기기에 API 키 저장”을 체크한 경우에만 localStorage에 저장
 - 브라우저 localStorage 키 저장은 개인 테스트용 편의 기능이며 안전한 비밀 저장소가 아님
@@ -302,6 +304,8 @@ npm run build
 - Direct BYOK 모드는 브라우저가 provider API를 직접 호출
 - Worker Proxy 모드는 브라우저가 Worker `/llm`을 호출하고 Worker가 provider API를 중계
 - Worker는 HP/MP/피해/보상/위치/스탯을 계산하지 않으며 규칙 결과를 수정하지 않음
+- Worker 자동 배포 workflow는 아직 TODO입니다. 현재 GitHub Pages workflow는 `worker:check`만 실행합니다.
+- AI 사용량/비용 추정은 prompt 전문이나 응답 전문을 저장하지 않고 문자 수만 기록합니다.
 
 
 ## 구현 완료: 인벤토리 보상 아이템 사용/판매와 마법서 습득

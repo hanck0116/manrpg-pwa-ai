@@ -2,13 +2,18 @@ import { callGemini } from './providers/gemini';
 import { callGroq } from './providers/groq';
 import { callOpenRouter } from './providers/openrouter';
 import { callViaProxy } from './providers/proxy';
+import { buildPrompt } from './prompt';
 import { getAISettings, getProviderOrder, hasProviderKey, type AISettings } from './settings';
 import type { LLMPayload, LLMResponse, LLMTask, ProviderName, ProviderPriority } from './types';
+import { recordAIUsage } from './usage';
 
 export const fallbackResponse: LLMResponse = {
   narration: 'AI 응답 없이 로컬 규칙 결과만 반영합니다.',
   combat_log: ['fallback:local-only'],
-  ui_tags: ['fallback']
+  ui_tags: ['fallback'],
+  meta: {
+    fallback: true
+  }
 };
 
 const defaultPriority: Required<ProviderPriority> = {
@@ -24,6 +29,19 @@ const providerCalls: Record<ProviderName, (task: LLMTask, payload: LLMPayload, s
   openrouter: callOpenRouter
 };
 
+const responseOutputChars = (response: LLMResponse): number => response.narration.length + response.combat_log.join('\n').length;
+
+const recordUsage = (task: LLMTask, provider: ProviderName | 'unknown', via: 'direct' | 'proxy' | 'fallback', fallback: boolean, inputChars: number, response: LLMResponse): void => {
+  recordAIUsage({
+    task,
+    provider,
+    via,
+    fallback,
+    inputChars,
+    outputChars: response.meta?.estimatedOutputChars ?? responseOutputChars(response)
+  });
+};
+
 export const routeProviders = (task: LLMTask, priority?: ProviderPriority): ProviderName[] => {
   const custom = priority?.[task];
 
@@ -32,8 +50,10 @@ export const routeProviders = (task: LLMTask, priority?: ProviderPriority): Prov
 
 export const callLLM = async (task: LLMTask, payload: LLMPayload): Promise<LLMResponse> => {
   const settings = getAISettings();
+  const inputChars = buildPrompt(task, payload).length;
 
   if (!settings.enabled) {
+    recordUsage(task, 'unknown', 'fallback', true, inputChars, fallbackResponse);
     return fallbackResponse;
   }
 
@@ -41,11 +61,19 @@ export const callLLM = async (task: LLMTask, payload: LLMPayload): Promise<LLMRe
     if (settings.useProxy && settings.proxyUrl.trim()) {
       try {
         const response = await callViaProxy(provider, task, payload, settings);
-        return {
+        const normalized = {
           narration: response.narration,
           combat_log: response.combat_log,
-          ui_tags: [...response.ui_tags, `provider:${provider}`, 'proxy']
+          ui_tags: [...response.ui_tags, `provider:${provider}`, 'proxy'],
+          meta: {
+            ...response.meta,
+            provider,
+            via: 'proxy' as const,
+            fallback: response.meta?.fallback ?? response.ui_tags.includes('fallback')
+          }
         };
+        recordUsage(task, provider, normalized.meta.fallback ? 'fallback' : 'proxy', normalized.meta.fallback ?? false, response.meta?.estimatedInputChars ?? inputChars, normalized);
+        return normalized;
       } catch {
         // Proxy/provider failures are intentionally silent and fall through.
       }
@@ -59,15 +87,24 @@ export const callLLM = async (task: LLMTask, payload: LLMPayload): Promise<LLMRe
 
     try {
       const response = await providerCalls[provider](task, payload, settings);
-      return {
+      const normalized = {
         narration: response.narration,
         combat_log: response.combat_log,
-        ui_tags: [...response.ui_tags, `provider:${provider}`]
+        ui_tags: [...response.ui_tags, `provider:${provider}`],
+        meta: {
+          ...response.meta,
+          provider,
+          via: 'direct' as const,
+          fallback: false
+        }
       };
+      recordUsage(task, provider, 'direct', false, inputChars, normalized);
+      return normalized;
     } catch {
       // Provider failures are intentionally silent and fall through to the next provider.
     }
   }
 
+  recordUsage(task, 'unknown', 'fallback', true, inputChars, fallbackResponse);
   return fallbackResponse;
 };

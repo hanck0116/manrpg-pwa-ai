@@ -34,6 +34,9 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Worker type check
+        run: npm run worker:check
+
       - name: Build
         run: npm run build
 

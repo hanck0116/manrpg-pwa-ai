@@ -43,11 +43,27 @@ ALLOWED_ORIGIN=https://hanck0116.github.io
 
 ## 7. 배포 방법
 
+로컬 개발:
+
 ```bash
-wrangler deploy
+npm run worker:dev
+```
+
+타입 확인:
+
+```bash
+npm run worker:check
+```
+
+배포:
+
+```bash
+npm run worker:deploy
 ```
 
 `wrangler.toml`의 기본 Worker 이름은 `manrpg-pwa-ai-relay`입니다.
+
+GitHub Pages workflow는 `npm run worker:check`만 실행합니다. Worker 자동 배포는 Cloudflare API Token이 필요하므로 별도 단계에서 다룹니다.
 
 ## 8. 앱에서 Worker URL 입력 방법
 
@@ -56,6 +72,7 @@ wrangler deploy
 3. Worker 프록시 사용을 체크합니다.
 4. Worker URL에 배포된 Worker 주소를 입력합니다.
 5. 연결 테스트를 누릅니다.
+6. Worker 상태 확인 버튼으로 `/health` 응답을 확인합니다.
 
 ## 9. 보안 주의
 
@@ -63,6 +80,7 @@ wrangler deploy
 - request body 전체를 로그에 남기지 않습니다.
 - 프롬프트 전문과 응답 전문을 localStorage에 저장하지 않습니다.
 - Worker는 규칙 판정 서버가 아니라 LLM relay입니다.
+- Worker 응답 meta에는 provider, fallback 여부, 시도한 provider 목록, 문자 수 기반 추정치 같은 안전한 정보만 담습니다.
 
 ## 10. 테스트 방법
 

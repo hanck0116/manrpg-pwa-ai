@@ -6,6 +6,15 @@ export type LLMResponse = {
   narration: string;
   combat_log: string[];
   ui_tags: string[];
+  meta?: {
+    provider?: string;
+    via?: 'direct' | 'proxy' | 'worker';
+    fallback?: boolean;
+    attemptedProviders?: string[];
+    errorCode?: string;
+    estimatedInputChars?: number;
+    estimatedOutputChars?: number;
+  };
 };
 
 export type LLMPayload = Record<string, unknown>;

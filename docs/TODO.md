@@ -52,11 +52,15 @@
 - [x] Worker relay 1차 구현
 - [x] Worker URL 설정 UI
 - [x] docs/WORKER.md 작성
+- [x] Worker 운영 안정화 1차
+- [x] Worker health 확인 UI
+- [x] AI 사용량/비용 추정 UI
+- [x] worker:check CI 연결
 
 ## 남은 TODO
 
-- [ ] Worker 운영 안정화
-- [ ] provider별 사용량/비용 표시
+- [ ] Worker 자동 배포 workflow
+- [ ] provider별 실제 사용량 API 연동
 - [ ] choice 선택권 실제 효과 구현
 - [ ] 일반 판정의 상황별 성공조건 정리
 - [ ] 스킬 실제 효과 구현

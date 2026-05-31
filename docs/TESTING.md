@@ -96,9 +96,13 @@ https://hanck0116.github.io/manrpg-pwa-ai/
 1. Worker `/health` 주소를 브라우저 또는 curl로 열어 `ok: true`를 확인합니다.
 2. AI 설정에서 Worker 프록시 사용을 체크합니다.
 3. Worker URL에 배포된 Worker 주소를 입력합니다.
-4. 연결 테스트를 눌러 프록시 연결 결과와 fallback 상태를 확인합니다.
-5. 같은 Provider/API 키로 Direct BYOK와 Worker Proxy를 각각 테스트합니다.
-6. 실패해도 게임 진행이 멈추지 않고 fallback 로그가 남는지 확인합니다.
+4. Worker 상태 확인 버튼을 눌러 service, version, provider true/false 표시를 확인합니다.
+5. 연결 테스트를 눌러 프록시 연결 결과와 fallback 상태를 확인합니다.
+6. 같은 Provider/API 키로 Direct BYOK와 Worker Proxy를 각각 테스트합니다.
+7. provider 키가 없을 때 fallback이 표시되는지 확인합니다.
+8. AI 사용량 요약의 요청 수와 fallback 횟수가 증가하는지 확인합니다.
+9. AI 사용량 초기화 버튼으로 기록이 초기화되는지 확인합니다.
+10. 실패해도 게임 진행이 멈추지 않고 fallback 로그가 남는지 확인합니다.
 
 ## 17. 저장/불러오기 테스트
 

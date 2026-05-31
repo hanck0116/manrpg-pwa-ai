@@ -23,7 +23,8 @@ import { loadGameStub, saveGameStub } from '../storage/save';
 import { buyShopItem, canBuyShopItem, getShopItems } from '../rules/shop';
 import { describeSpell } from '../rules/spell';
 import { callLLM } from '../ai/router';
-import { setAISettings, clearAIKeys, type AIProvider, type AISettings } from '../ai/settings';
+import { setAISettings, clearAIKeys, getAISettings, type AIProvider, type AISettings } from '../ai/settings';
+import { clearAIUsage } from '../ai/usage';
 import {
   allocatableStatKeys,
   canDecreaseStat,
@@ -751,6 +752,49 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
         setAISettingsStatus('API 키를 지웠습니다.');
         setState(appendLog(getState(), 'AI API 키를 지웠습니다.'));
       } catch (error) {
+        logError(error);
+      }
+      return;
+    }
+
+    if (target.dataset.aiClearUsage !== undefined) {
+      try {
+        clearAIUsage();
+        setAISettingsStatus('AI 사용량 기록을 초기화했습니다.');
+        setState(appendLog(getState(), 'AI 사용량 기록을 초기화했습니다.'));
+      } catch (error) {
+        logError(error);
+      }
+      return;
+    }
+
+    if (target.dataset.aiWorkerHealth !== undefined) {
+      try {
+        setAISettings(collectAISettings(root));
+        const proxyUrl = getAISettings().proxyUrl.trim().replace(/\/$/, '');
+
+        if (!proxyUrl) {
+          setState(appendLog(getState(), 'Worker URL을 입력하세요.'));
+          return;
+        }
+
+        const response = await fetch(`${proxyUrl}/health`);
+
+        if (!response.ok) {
+          setAISettingsStatus('Worker 상태 확인 실패');
+          setState(appendLog(getState(), 'Worker 상태 확인 실패'));
+          return;
+        }
+
+        const health = (await response.json()) as { service?: string; version?: string; providers?: Record<string, boolean> };
+        const providers = Object.entries(health.providers ?? {})
+          .map(([provider, available]) => `${provider}:${available ? '있음' : '없음'}`)
+          .join(', ');
+        const message = `Worker 상태: ${health.service ?? 'unknown'} ${health.version ?? ''} (${providers || 'provider 정보 없음'})`;
+        setAISettingsStatus(message);
+        setState(appendLog(getState(), message));
+      } catch (error) {
+        setAISettingsStatus('Worker 상태 확인 실패');
         logError(error);
       }
       return;

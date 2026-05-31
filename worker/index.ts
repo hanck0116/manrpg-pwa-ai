@@ -18,7 +18,11 @@ type RelayRequest = {
 const fallbackResponse: LLMResponse = {
   narration: 'AI 응답 없이 로컬 규칙 결과만 반영합니다.',
   combat_log: ['fallback:local-only'],
-  ui_tags: ['fallback']
+  ui_tags: ['fallback'],
+  meta: {
+    fallback: true,
+    via: 'worker'
+  }
 };
 
 const defaultPriority: Record<LLMTask, ProviderName[]> = {
@@ -78,6 +82,20 @@ const normalizeResponse = (text: string): LLMResponse => {
   }
 };
 
+const outputChars = (response: LLMResponse): number => response.narration.length + response.combat_log.join('\n').length;
+
+export const classifyProviderError = (error: unknown, responseStatus?: number): NonNullable<LLMResponse['meta']>['errorCode'] => {
+  if (responseStatus === 401) return 'provider-401';
+  if (responseStatus === 403) return 'provider-403';
+  if (responseStatus === 429) return 'provider-429';
+  if (responseStatus !== undefined && responseStatus >= 500) return 'provider-5xx';
+  if (error instanceof Error && error.message === 'missing-key') return 'missing-key';
+  if (error instanceof DOMException && error.name === 'AbortError') return 'timeout';
+  if (error instanceof Error && error.name === 'AbortError') return 'timeout';
+  if (error instanceof TypeError) return 'network';
+  return 'unknown';
+};
+
 const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs = 15000): Promise<Response> => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -121,7 +139,7 @@ const callOpenAICompatible = async (endpoint: string, key: string, model: string
   });
 
   if (!response.ok) {
-    throw new Error(`Provider request failed with status ${response.status}.`);
+    throw new Error(`provider-status:${response.status}`);
   }
 
   return normalizeResponse(await extractOpenAIText(response));
@@ -143,7 +161,7 @@ const callGemini = async (key: string, model: string, prompt: string): Promise<L
   });
 
   if (!response.ok) {
-    throw new Error(`Provider request failed with status ${response.status}.`);
+    throw new Error(`provider-status:${response.status}`);
   }
 
   const data = (await response.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
@@ -160,7 +178,7 @@ const callProvider = async (provider: ProviderName, request: RelayRequest, env: 
   const key = keyForProvider(provider, env, request.playerKey);
 
   if (!key) {
-    throw new Error('Provider key is missing.');
+    throw new Error('missing-key');
   }
 
   const model = request.model || defaultModels[provider];
@@ -212,6 +230,15 @@ const parseRelayRequest = async (request: Request): Promise<RelayRequest | Respo
   };
 };
 
+const statusFromError = (error: unknown): number | undefined => {
+  if (!(error instanceof Error) || !error.message.startsWith('provider-status:')) {
+    return undefined;
+  }
+
+  const status = Number(error.message.replace('provider-status:', ''));
+  return Number.isFinite(status) ? status : undefined;
+};
+
 const handleLlm = async (request: Request, env: Env): Promise<Response> => {
   const parsed = await parseRelayRequest(request);
 
@@ -220,24 +247,50 @@ const handleLlm = async (request: Request, env: Env): Promise<Response> => {
   }
 
   const providers = parsed.provider ? [parsed.provider, ...defaultPriority[parsed.task].filter((provider) => provider !== parsed.provider)] : defaultPriority[parsed.task];
+  const attemptedProviders: string[] = [];
+  let lastErrorCode: NonNullable<LLMResponse['meta']>['errorCode'] | undefined;
 
   for (const provider of providers) {
+    attemptedProviders.push(provider);
     try {
       const response = await callProvider(provider, parsed, env);
       return jsonResponse(
         {
           narration: response.narration,
           combat_log: response.combat_log,
-          ui_tags: [...response.ui_tags, `provider:${provider}`]
+          ui_tags: [...response.ui_tags, `provider:${provider}`],
+          meta: {
+            ...response.meta,
+            provider,
+            via: 'worker',
+            fallback: false,
+            attemptedProviders,
+            estimatedInputChars: parsed.prompt.length,
+            estimatedOutputChars: outputChars(response)
+          }
         },
         env
       );
-    } catch {
+    } catch (error) {
+      const errorCode = classifyProviderError(error, statusFromError(error));
+      lastErrorCode = lastErrorCode && errorCode === 'missing-key' ? lastErrorCode : errorCode;
       // Provider failures fall through without logging keys, prompts, or full responses.
     }
   }
 
-  return jsonResponse(fallbackResponse, env);
+  return jsonResponse(
+    {
+      ...fallbackResponse,
+      meta: {
+        ...fallbackResponse.meta,
+        attemptedProviders,
+        errorCode: lastErrorCode,
+        estimatedInputChars: parsed.prompt.length,
+        estimatedOutputChars: outputChars(fallbackResponse)
+      }
+    },
+    env
+  );
 };
 
 export default {

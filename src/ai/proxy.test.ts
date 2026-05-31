@@ -55,6 +55,10 @@ describe('AI proxy routing', () => {
     expect(body.playerKey).toBe('secret-player-key');
     expect(body.prompt).toContain('HP/MP/피해/보상 변경 금지');
 
+    const { getAIUsageEntries } = await import('./usage');
+    expect(getAIUsageEntries()).toHaveLength(1);
+    expect(getAIUsageEntries()[0]).toMatchObject({ provider: 'groq', via: 'proxy', fallback: false });
+
     vi.unstubAllGlobals();
   });
 
@@ -78,6 +82,8 @@ describe('AI proxy routing', () => {
     const response = await callLLM('narrate', { summary: 'test' });
 
     expect(response.ui_tags).toContain('fallback');
+    const { getAIUsageEntries } = await import('./usage');
+    expect(getAIUsageEntries()[0]).toMatchObject({ provider: 'unknown', via: 'fallback', fallback: true });
 
     vi.unstubAllGlobals();
   });
