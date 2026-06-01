@@ -56,7 +56,9 @@ describe('tab UI', () => {
     expect(root.innerHTML).toContain('data-tab="battle" class="active"');
     expect(root.innerHTML).toContain('11x11 고정 맵');
     expect(root.innerHTML).toContain('행동 추가');
+    expect(root.innerHTML).toContain('보유 기술');
     expect(root.innerHTML).toContain('보유 스킬');
+    expect(root.innerHTML).not.toContain('기술 제작</summary>');
     expect(root.innerHTML).not.toContain('스킬 생성');
     expect(root.innerHTML).toContain('보유 마법');
     expect(root.innerHTML).toContain('적 간단 시트');
@@ -71,10 +73,38 @@ describe('tab UI', () => {
     expect(root.innerHTML).toContain('data-angel-manual-score');
 
     await getClickHandler()({ target: new TestButton({ tab: 'sheet' }) });
+    expect(root.innerHTML).toContain('기술 제작');
+    expect(root.innerHTML).toContain('사용 가능한 기술 제작 출처가 없어 제작할 수 없습니다.');
     expect(root.innerHTML).toContain('스킬 생성');
 
     await getClickHandler()({ target: new TestButton({ tab: 'ai' }) });
     expect(root.innerHTML).toContain('<details class="panel ai-settings" open>');
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('technique UI', () => {
+  it('shows usable source in sheet creation UI', async () => {
+    class TestButton {
+      dataset: Record<string, string>;
+      constructor(dataset: Record<string, string>) {
+        this.dataset = dataset;
+      }
+    }
+    vi.stubGlobal('HTMLButtonElement', TestButton);
+    const { root, getClickHandler } = makeRoot();
+    let state = { ...createInitialGameState(), techniqueSources: ['공법'] };
+    const setState = (next: GameState): void => {
+      state = next;
+      render(root, state);
+    };
+
+    render(root, state);
+    bindUI(root, () => state, setState);
+    await getClickHandler()({ target: new TestButton({ tab: 'sheet' }) });
+
+    expect(root.innerHTML).toContain('보유 기술');
+    expect(root.innerHTML).toContain('<option value=\"공법\">공법</option>');
     vi.unstubAllGlobals();
   });
 });

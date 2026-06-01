@@ -66,7 +66,7 @@ describe('equipment flow', () => {
     expect(unequipped.equipment.weapon).toBeDefined();
   });
 
-  it('saveVersion 14 validates equipment', () => {
+  it('saveVersion 15 validates equipment', () => {
     const storage = new Map<string, string>();
     vi.stubGlobal('localStorage', {
       getItem: vi.fn((key: string) => storage.get(key) ?? null),
@@ -81,7 +81,7 @@ describe('equipment flow', () => {
     const item = equipmentToRewardItem(getDefaultEquipmentItems()[0]);
     const state = equipItem({ ...maintenanceState(), inventory: [item] }, item.id);
 
-    expect(saveGameStub(state)).toContain('saveVersion 14');
+    expect(saveGameStub(state)).toContain('saveVersion 15');
     expect(loadGameStub().equipment.weapon?.name).toBe('훈련용 검');
 
     vi.unstubAllGlobals();

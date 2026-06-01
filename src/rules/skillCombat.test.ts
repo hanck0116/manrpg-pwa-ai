@@ -29,3 +29,32 @@ describe('skill combat', () => {
     expect(result.player.guarding).toBe(true);
   });
 });
+
+it('uses optional original-sheet deltas and damage multiplier before fallback', () => {
+  const state = createInitialGameState();
+  const skill = createPlayerSkill({
+    name: '확장 스킬',
+    resourceType: 'none',
+    effectType: 'damage',
+    multiplier: 1,
+    mpDelta: -1,
+    hpDelta: 1,
+    damageMultiplier: 2,
+    judgeStat: 'strength',
+    judgeBonus: 1
+  });
+  const result = resolveSkillUse({ ...state.player, hp: 5 }, state.enemy, skill);
+
+  expect(result.player.mp).toBe(state.player.mp - 1);
+  expect(result.player.hp).toBe(6);
+  expect(result.enemy.hp).toBe(state.enemy.hp - state.player.derived.attack * 2);
+});
+
+it('blocks passive skills in combat', () => {
+  const state = createInitialGameState();
+  const skill = createPlayerSkill({ name: '패시브', resourceType: 'none', effectType: 'todo', multiplier: 1, kind: 'passive', timing: 'passive', passiveStat: 'strength', passiveValue: 1 });
+  const result = resolveSkillUse(state.player, state.enemy, skill);
+
+  expect(result.log).toContain('패시브');
+  expect(result.enemy.hp).toBe(state.enemy.hp);
+});

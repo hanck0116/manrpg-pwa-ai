@@ -1,4 +1,5 @@
-import type { PlayerSkill, SkillResourceType, SkillTiming } from '../state/gameState';
+import { validTechniqueJudgeStats, validTechniqueKinds } from './technique';
+import type { PlayerSkill, SkillResourceType, SkillTiming, TechniqueJudgeStat, TechniqueKind } from '../state/gameState';
 
 export type SkillInput = {
   name: string;
@@ -11,6 +12,14 @@ export type SkillInput = {
   target?: 'enemy' | 'self';
   effectType: PlayerSkill['effectType'];
   source?: string;
+  mpDelta?: number;
+  hpDelta?: number;
+  damageMultiplier?: number;
+  judgeStat?: TechniqueJudgeStat;
+  judgeBonus?: number;
+  kind?: TechniqueKind | 'passive';
+  passiveStat?: Exclude<TechniqueJudgeStat, 'none'>;
+  passiveValue?: number;
 };
 
 export type SkillValidationResult = {
@@ -23,6 +32,7 @@ const createId = (prefix: string): string =>
 
 const validResourceTypes: SkillResourceType[] = ['outer', 'inner', 'sword', 'magic', 'none'];
 const validEffectTypes: PlayerSkill['effectType'][] = ['damage', 'heal', 'guard', 'todo'];
+const validPassiveStats: Exclude<TechniqueJudgeStat, 'none'>[] = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'appearance'];
 
 export const validateSkillInput = (input: SkillInput): SkillValidationResult => {
   if (!input.name.trim()) {
@@ -40,6 +50,15 @@ export const validateSkillInput = (input: SkillInput): SkillValidationResult => 
   if (!Number.isFinite(input.multiplier) || input.multiplier <= 0) {
     return { ok: false, message: '스킬 배율은 0보다 큰 숫자여야 합니다.' };
   }
+
+  if (input.mpDelta !== undefined && !Number.isFinite(input.mpDelta)) return { ok: false, message: 'MP 변화량은 숫자여야 합니다.' };
+  if (input.hpDelta !== undefined && !Number.isFinite(input.hpDelta)) return { ok: false, message: 'HP 변화량은 숫자여야 합니다.' };
+  if (input.damageMultiplier !== undefined && (!Number.isFinite(input.damageMultiplier) || input.damageMultiplier < 0)) return { ok: false, message: '공격 피해 배수는 0 이상 숫자여야 합니다.' };
+  if (input.judgeStat !== undefined && !validTechniqueJudgeStats.includes(input.judgeStat)) return { ok: false, message: '판정 스탯이 올바르지 않습니다.' };
+  if (input.judgeBonus !== undefined && !Number.isFinite(input.judgeBonus)) return { ok: false, message: '판정 보정은 숫자여야 합니다.' };
+  if (input.kind !== undefined && input.kind !== 'passive' && !validTechniqueKinds.includes(input.kind)) return { ok: false, message: '스킬 유형이 올바르지 않습니다.' };
+  if (input.passiveStat !== undefined && !validPassiveStats.includes(input.passiveStat)) return { ok: false, message: '패시브 스탯이 올바르지 않습니다.' };
+  if (input.passiveValue !== undefined && !Number.isFinite(input.passiveValue)) return { ok: false, message: '패시브 값은 숫자여야 합니다.' };
 
   return { ok: true, message: '스킬 입력이 유효합니다.' };
 };
@@ -62,7 +81,15 @@ export const createPlayerSkill = (input: SkillInput): PlayerSkill => {
     range: input.range,
     target: input.target ?? (input.effectType === 'damage' ? 'enemy' : 'self'),
     effectType: input.effectType,
-    source: input.source
+    source: input.source,
+    mpDelta: input.mpDelta,
+    hpDelta: input.hpDelta,
+    damageMultiplier: input.damageMultiplier,
+    judgeStat: input.judgeStat,
+    judgeBonus: input.judgeBonus,
+    kind: input.kind,
+    passiveStat: input.passiveStat,
+    passiveValue: input.passiveValue
   };
 };
 

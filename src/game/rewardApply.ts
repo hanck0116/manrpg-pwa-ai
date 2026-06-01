@@ -1,45 +1,33 @@
 import { makeItem } from '../rules/reward';
+import { isTechniqueSourceName } from '../rules/technique';
 import { appendLog, type GameState, type RewardItem } from '../state/gameState';
 import { refreshPlayer } from './characterUpdate';
+import { unlockTechniqueSource } from './techniqueBook';
 
 const traitChoices = [
   '모델링',
-  '공법',
-  '무공',
   '시분할',
-  '극기',
   '심법',
-  '오리지널 스킬',
   '임모탈 평선',
-  '유물',
-  '하급 정령',
-  '연혼염',
   '자기상환적 돌연변이',
   '삼매경',
   '접기',
   '심적초월',
   '신적초월',
-  '중급 정령',
-  '흑염의 영체화',
-  '상급 정령',
-  '빙백연혼',
   '원영',
   '금강불괴의 정신',
-  '정령왕',
-  '헤일로',
-  '입천',
   '스키마: 회복력 강화',
   '스키마: 근력 강화',
-  '스키마: 속도강화',
-  '앙케 라'
+  '스키마: 속도강화'
 ];
 
 export const isTraitChoice = (choice: string): boolean => traitChoices.includes(choice);
 
-export const getTraitRestrictionReason = (trait: string, traits: string[]): string => {
-  if (trait === '중급 정령' && !traits.includes('하급 정령')) return '하급 정령이 없으면 중급 정령을 선택할 수 없음';
-  if (trait === '상급 정령' && !traits.includes('중급 정령')) return '중급 정령이 없으면 상급 정령을 선택할 수 없음';
-  if (trait === '정령왕' && !(traits.includes('하급 정령') && traits.includes('중급 정령') && traits.includes('상급 정령'))) {
+export const getTraitRestrictionReason = (trait: string, traits: string[], techniqueSources: string[] = []): string => {
+  const has = (name: string): boolean => traits.includes(name) || techniqueSources.includes(name);
+  if (trait === '중급 정령' && !has('하급 정령')) return '하급 정령이 없으면 중급 정령을 선택할 수 없음';
+  if (trait === '상급 정령' && !has('중급 정령')) return '중급 정령이 없으면 상급 정령을 선택할 수 없음';
+  if (trait === '정령왕' && !(has('하급 정령') && has('중급 정령') && has('상급 정령'))) {
     return '모든 정령이 없으면 정령왕을 선택할 수 없음';
   }
 
@@ -47,14 +35,14 @@ export const getTraitRestrictionReason = (trait: string, traits: string[]): stri
 };
 
 export const addTraitIfAllowed = (state: GameState, trait: string): { state: GameState; applied: boolean; message: string } => {
-  const reason = getTraitRestrictionReason(trait, state.player.stats.traits);
+  const reason = getTraitRestrictionReason(trait, state.player.stats.traits, state.techniqueSources);
 
   if (reason) {
     return { state, applied: false, message: reason };
   }
 
   if (state.player.stats.traits.includes(trait)) {
-    return { state, applied: true, message: '이미 보유한 특성입니다.' };
+    return { state, applied: false, message: '이미 보유한 특성입니다. 다른 선택지를 고르세요.' };
   }
 
   const next = refreshPlayer({
@@ -80,13 +68,33 @@ const choiceToItem = (choice: string): RewardItem => makeItem(choice);
 
 export const applyChoiceItemResult = (state: GameState, sourceItemId: string, sourceItemName: string, choice: string): GameState => {
   const baseLog = `${sourceItemName}: ${choice}을 선택했습니다.`;
-  const restriction = getTraitRestrictionReason(choice, state.player.stats.traits);
+  const restriction = getTraitRestrictionReason(choice, state.player.stats.traits, state.techniqueSources);
 
   if (restriction) {
     return appendLog(state, restriction);
   }
 
-  let next = removeSourceItem(state, sourceItemId);
+  if (state.player.stats.traits.includes(choice)) {
+    return appendLog(state, '이미 보유한 특성입니다. 다른 선택지를 고르세요.');
+  }
+
+  if (isTechniqueSourceName(choice)) {
+    const unlocked = unlockTechniqueSource(state, choice);
+    if (!unlocked.unlocked) {
+      return appendLog(state, unlocked.message);
+    }
+
+    return appendLog(
+      {
+        ...unlocked.state,
+        inventory: unlocked.state.inventory.filter((item) => item.id !== sourceItemId),
+        pendingChoice: undefined
+      },
+      `${baseLog} ${unlocked.message}`
+    );
+  }
+
+  let next: GameState = { ...removeSourceItem(state, sourceItemId), pendingChoice: undefined };
   let applyMessage = '';
 
   if (choice === '50코인') {
@@ -116,6 +124,9 @@ export const applyChoiceItemResult = (state: GameState, sourceItemId: string, so
     applyMessage = '스키마 효과 선택권을 인벤토리에 추가했습니다.';
   } else if (isTraitChoice(choice)) {
     const applied = addTraitIfAllowed(next, choice);
+    if (!applied.applied) {
+      return appendLog(state, applied.message);
+    }
     next = applied.state;
     applyMessage = applied.message;
   } else {

@@ -1,8 +1,10 @@
 import { getMagicBookConfig, rollSpellFromGrade, SPELLS, tryLearnMagicBook } from '../rules/spell';
+import { isTechniqueSourceName } from '../rules/technique';
 import { appendLog, type GameState, type LearnedSpell, type RewardItem } from '../state/gameState';
 import { refreshPlayer, updatePlayerStats } from './characterUpdate';
 import { equipItem } from './equipment';
-import { addTraitIfAllowed } from './rewardApply';
+import { addTraitIfAllowed, getTraitRestrictionReason } from './rewardApply';
+import { unlockTechniqueSource } from './techniqueBook';
 
 const maintenancePhases: GameState['phase'][] = ['reward-pending', 'level-up-pending', 'floor-cleared', 'battle-ended'];
 
@@ -206,6 +208,19 @@ export const useInventoryItem = (state: GameState, itemId: string): GameState =>
     return createChoiceItemChoice(state, item);
   }
 
+  if (isTechniqueSourceName(item.name)) {
+    const restriction = getTraitRestrictionReason(item.name, state.player.stats.traits, state.techniqueSources);
+    if (restriction) {
+      return appendLog(state, restriction);
+    }
+
+    const unlocked = unlockTechniqueSource(state, item.name);
+    if (!unlocked.unlocked) {
+      return appendLog(state, unlocked.message);
+    }
+
+    return appendLog(removeItemWithoutLog(unlocked.state, itemId), unlocked.message);
+  }
 
   if (item.type === 'trait') {
     const applied = addTraitIfAllowed(state, item.name);

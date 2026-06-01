@@ -384,3 +384,17 @@ button:disabled {
   gap: 0.65rem;
   margin-top: 0.8rem;
 }
+
+.techniques-panel details,
+.skills-panel details {
+  margin-block: 0.5rem;
+}
+
+.techniques-panel select,
+.techniques-panel input,
+.techniques-panel textarea,
+.skills-panel select,
+.skills-panel input,
+.skills-panel textarea {
+  width: 100%;
+}
