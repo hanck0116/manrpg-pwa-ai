@@ -17,7 +17,7 @@ import {
 import { unequipItem } from '../game/equipment';
 import { getBattleUsableItems, sellInventoryItem, useInventoryItem } from '../game/inventory';
 import { applyFiveLevelPlus, canFinishLevelAllocation, finishLevelAllocation } from '../game/levelUp';
-import { resolvePlayerReaction } from '../game/reactionFlow';
+import { resolvePlayerReaction, resolvePlayerReactionSkill } from '../game/reactionFlow';
 import { createRewardOffer, claimSelectedRewards, toggleRewardSelection } from '../game/rewardFlow';
 import { advanceTurn, createNewBattleFromPlayer } from '../game/turn';
 import { fixedMap, MAP_SIZE } from '../map/fixedMap';
@@ -33,6 +33,7 @@ import { clearAIUsage } from '../ai/usage';
 import { addPlayerSkill } from '../game/skillBook';
 import { addPlayerTechnique } from '../game/techniqueBook';
 import { getEquipmentLabel } from '../rules/equipment';
+import { summarizePassiveSkills } from '../rules/passiveSkill';
 import {
   allocatableStatKeys,
   canDecreaseStat,
@@ -583,14 +584,15 @@ const renderKnownSpells = (state: GameState): string => `
 
 const renderKnownSkillsForBattle = (state: GameState): string => {
   const canQueueSkill = state.phase === 'player-main' && !state.setupMode && !state.levelUpPending;
+  const usableSkills = state.skills.filter((skill) => skill.timing === 'main');
 
   return `
     <section class="panel skills-panel">
       <details>
         <summary>보유 스킬 (${state.skills.length})</summary>
         ${
-          state.skills.length === 0
-            ? '<p class="muted">보유 스킬이 없습니다.</p>'
+          usableSkills.length === 0
+            ? '<p class="muted">전투 메인턴에 사용할 수 있는 보유 스킬이 없습니다.</p>'
             : `<ul class="inventory-list">${state.skills
                 .map(
                   (skill) => `
@@ -653,6 +655,13 @@ const renderSkillManagement = (state: GameState): string => {
         </label>
         <label>배율 <input type="number" min="0.1" step="0.1" data-skill-multiplier value="1" /></label>
         <label>스킬 유형 <select data-skill-kind>${kindOptions(true)}</select></label>
+        <label>사용 타이밍
+          <select data-skill-timing>
+            <option value="main">메인턴</option>
+            <option value="reaction">반응턴</option>
+            <option value="passive">패시브</option>
+          </select>
+        </label>
         <label>MP 변화량 <input type="number" step="1" data-skill-mp-delta value="0" /></label>
         <label>HP 변화량 <input type="number" step="1" data-skill-hp-delta value="0" /></label>
         <label>공격 피해 배수 <input type="number" min="0" step="0.1" data-skill-damage-multiplier value="0" /></label>
@@ -697,14 +706,15 @@ const kindOptions = (includePassive = false): string =>
 
 const renderKnownTechniquesForBattle = (state: GameState): string => {
   const canQueueTechnique = state.phase === 'player-main' && !state.setupMode && !state.levelUpPending;
+  const usableTechniques = state.techniques;
 
   return `
     <section class="panel techniques-panel">
       <details>
         <summary>보유 기술 (${state.techniques.length})</summary>
         ${
-          state.techniques.length === 0
-            ? '<p class="muted">보유 기술이 없습니다.</p>'
+          usableTechniques.length === 0
+            ? '<p class="muted">전투 메인턴에 사용할 수 있는 보유 기술이 없습니다.</p>'
             : `<ul class="inventory-list">${state.techniques
                 .map(
                   (technique) => `
@@ -727,7 +737,7 @@ const renderTechniqueManagement = (state: GameState): string => {
 
   return `
     <section class="panel techniques-panel">
-      <details open>
+      <details>
         <summary>기술 제작 출처 (${state.techniqueSources.length})</summary>
         ${state.techniqueSources.length === 0 ? '<p class="muted">해금된 기술 제작 출처가 없습니다. 공법/무공/오리지널 스킬/유물 등 출처 아이템을 사용하거나 선택권에서 고르세요.</p>' : `<p>${state.techniqueSources.join(', ')}</p>`}
       </details>
@@ -741,7 +751,7 @@ const renderTechniqueManagement = (state: GameState): string => {
                 .join('')}</ul>`
         }
       </details>
-      <details open>
+      <details>
         <summary>기술 제작</summary>
         <p class="muted">해금된 출처 1개당 기술 1개만 제작합니다. 상태이상/소환/광역 효과는 실제 효과가 아니라 설명에만 남깁니다.</p>
         ${unusedSources.length === 0 ? '<p class="muted">사용 가능한 기술 제작 출처가 없어 제작할 수 없습니다.</p>' : ''}
@@ -796,6 +806,8 @@ const renderReactionPanel = (state: GameState): string => {
     return '';
   }
 
+  const reactionSkills = state.skills.filter((skill) => skill.timing === 'reaction');
+
   return `
     <section class="panel reaction-panel">
       <h2>반응턴</h2>
@@ -807,6 +819,10 @@ const renderReactionPanel = (state: GameState): string => {
         <button type="button" data-reaction="counter">카운터</button>
         <button type="button" data-reaction="none">반응 안 함</button>
       </div>
+      <details open>
+        <summary>반응 스킬 (${reactionSkills.length})</summary>
+        ${reactionSkills.length === 0 ? '<p class="muted">사용 가능한 반응 스킬이 없습니다.</p>' : `<div class="action-grid">${reactionSkills.map((skill) => `<button type="button" data-reaction-skill="${skill.id}">${skill.name}</button>`).join('')}</div>`}
+      </details>
     </section>
   `;
 };
@@ -906,8 +922,8 @@ const renderBattleTab = (state: GameState): string => `
     <div>
       ${renderTurnStatus(state)}
       ${renderMap(state)}
-      <section class="panel minimap"><h2>미니맵 요약</h2><p>${getMinimapSummary(state)}</p></section>
       ${renderReactionPanel(state)}
+      <section class="panel minimap"><h2>미니맵 요약</h2><p>${getMinimapSummary(state)}</p></section>
       ${renderActionQueue(state)}
       ${renderActionButtons(state)}
     </div>
@@ -922,12 +938,27 @@ const renderBattleTab = (state: GameState): string => `
   </section>
 `;
 
+
+const renderPassiveSummary = (state: GameState): string => {
+  const summaries = summarizePassiveSkills(state.skills);
+
+  return `
+    <section class="panel passive-summary">
+      <h2>적용 중인 패시브</h2>
+      ${summaries.length === 0 ? '<p class="muted">적용 중인 패시브 스킬이 없습니다.</p>' : `<ul>${summaries.map((summary) => `<li>${summary}</li>`).join('')}</ul>`}
+      <p class="muted">판정은 1d100 ≤ 스탯+보정으로 처리됩니다. 상황별 성공조건은 추후 정밀화 예정입니다.</p>
+      <p class="muted">기술 제작 출처 ${state.techniqueSources.length}개 / 보유 기술 ${state.techniques.length}개</p>
+    </section>
+  `;
+};
+
 const renderSheetTab = (state: GameState): string => `
   <section class="tab-panel" data-tab-panel="sheet">
     ${renderCharacterCard(state.player)}
     ${renderStatAllocationPanel(state)}
     ${renderLevelUpAllocationPanel(state)}
     ${renderTechniqueManagement(state)}
+    ${renderPassiveSummary(state)}
     ${renderSkillManagement(state)}
     ${renderKnownSpells(state)}
     ${renderEquipmentPanel(state)}
@@ -1073,6 +1104,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const buyShopItemId = target.dataset.buyShopItem;
     const confirmChoiceId = target.dataset.confirmChoice;
     const reaction = target.dataset.reaction as 'dodge' | 'guard' | 'counter' | 'none' | undefined;
+    const reactionSkillId = target.dataset.reactionSkill;
     const debugAction = target.dataset.debugAction;
     const tab = target.dataset.tab as AppTab | undefined;
     const angelManualScore = Number(getInputValue(root, '[data-angel-manual-score]'));
@@ -1288,6 +1320,11 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
       return;
     }
 
+    if (reactionSkillId) {
+      await setStateWithAuto(resolvePlayerReactionSkill(getState(), reactionSkillId), '반응 스킬 처리 후');
+      return;
+    }
+
     if (statIncrease) {
       setState(increaseStat(getState(), statIncrease));
       return;
@@ -1439,7 +1476,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
           multiplier: Number(getInputValue(root, '[data-skill-multiplier]') || 1),
           source: 'user',
           kind: getInputValue(root, '[data-skill-kind]') as TechniqueKind | 'passive',
-          timing: getInputValue(root, '[data-skill-kind]') === 'passive' ? 'passive' : 'main',
+          timing: getInputValue(root, '[data-skill-kind]') === 'passive' ? 'passive' : (getInputValue(root, '[data-skill-timing]') as 'main' | 'reaction' | 'passive'),
           mpDelta: Number(getInputValue(root, '[data-skill-mp-delta]') || 0),
           hpDelta: Number(getInputValue(root, '[data-skill-hp-delta]') || 0),
           damageMultiplier: Number(getInputValue(root, '[data-skill-damage-multiplier]') || 0),

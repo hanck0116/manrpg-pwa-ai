@@ -1,9 +1,11 @@
 import { calcDerivedStats } from '../rules/derivedStats';
+import { applyPassiveSkillStats } from '../rules/passiveSkill';
 import { applyEquipmentBonuses } from '../rules/equipment';
-import type { Character, CoreStats, EquipmentLoadout, GameState } from '../state/gameState';
+import type { Character, CoreStats, EquipmentLoadout, GameState, PlayerSkill } from '../state/gameState';
 
-export const refreshCharacter = (character: Character, equipment?: EquipmentLoadout): Character => {
-  const derived = calcDerivedStats(character.stats);
+export const refreshCharacter = (character: Character, equipment?: EquipmentLoadout, skills: PlayerSkill[] = []): Character => {
+  const effectiveStats = character.kind === 'player' ? applyPassiveSkillStats(character.stats, skills) : character.stats;
+  const derived = calcDerivedStats(effectiveStats);
 
   const refreshed = {
     ...character,
@@ -17,7 +19,7 @@ export const refreshCharacter = (character: Character, equipment?: EquipmentLoad
 
 export const refreshPlayer = (state: GameState): GameState => ({
   ...state,
-  player: refreshCharacter(state.player, state.equipment)
+  player: refreshCharacter(state.player, state.equipment, state.skills)
 });
 
 export const updatePlayerStats = (state: GameState, updater: (stats: CoreStats) => CoreStats): GameState =>

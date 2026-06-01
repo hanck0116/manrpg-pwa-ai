@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runEnemyMainTurn } from './enemyAI';
-import { resolvePlayerReaction } from './reactionFlow';
+import { createPlayerSkill } from '../rules/skill';
 import { createInitialGameState, type GameState } from '../state/gameState';
+import { runEnemyMainTurn } from './enemyAI';
+import { resolvePlayerReaction, resolvePlayerReactionSkill } from './reactionFlow';
 
 const enemyAttackState = (guarding = false): GameState => ({
   ...createInitialGameState(),
@@ -52,6 +53,35 @@ describe('반응 흐름', () => {
 
     expect(next.player.hp).toBe(beforeHp - 1);
     expect(next.player.guarding).toBe(false);
+    expect(next.phase).toBe('player-main');
+  });
+
+  it('반응 스킬 사용 시 pendingReaction을 해소하고 피해를 적용합니다', () => {
+    const skill = createPlayerSkill({ name: '반격기', resourceType: 'none', timing: 'reaction', effectType: 'damage', multiplier: 1 });
+    const reacting = { ...runEnemyMainTurn(enemyAttackState(false)), skills: [skill] };
+
+    const next = resolvePlayerReactionSkill(reacting, skill.id);
+
+    expect(next.pendingReaction).toBeUndefined();
+    expect(next.phase).toBe('player-main');
+    expect(next.enemy.hp).toBeLessThan(reacting.enemy.hp);
+  });
+
+  it('플레이어 반응턴이 아니면 반응 스킬을 사용할 수 없습니다', () => {
+    const skill = createPlayerSkill({ name: '반응 회복', resourceType: 'none', timing: 'reaction', effectType: 'heal', multiplier: 1 });
+    const state = { ...createInitialGameState(), setupMode: false, phase: 'player-main' as const, skills: [skill] };
+
+    const next = resolvePlayerReactionSkill(state, skill.id);
+
+    expect(next.phase).toBe('player-main');
+    expect(next.log.at(-1)?.message).toContain('플레이어 반응턴');
+  });
+
+  it('반응 스킬 실패도 반응턴을 종료합니다', () => {
+    const reacting = runEnemyMainTurn(enemyAttackState(false));
+    const next = resolvePlayerReactionSkill(reacting, 'missing');
+
+    expect(next.pendingReaction).toBeUndefined();
     expect(next.phase).toBe('player-main');
   });
 });

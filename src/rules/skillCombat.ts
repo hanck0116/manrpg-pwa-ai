@@ -1,4 +1,5 @@
 import type { Character, PlayerSkill } from '../state/gameState';
+import { resolveJudgement } from './judgement';
 
 export type SkillUseResult = {
   player: Character;
@@ -16,8 +17,7 @@ const basePowerForSkill = (player: Character, skill: PlayerSkill): number => {
   return 1;
 };
 
-const judgeText = (skill: PlayerSkill): string =>
-  skill.judgeStat && skill.judgeStat !== 'none' ? ` 판정 참고: ${skill.judgeStat} ${(skill.judgeBonus ?? 0) >= 0 ? '+' : ''}${skill.judgeBonus ?? 0}.` : '';
+const judgementText = (log: string): string => ` 판정 결과: ${log}.`;
 
 const applyOptionalDeltas = (player: Character, skill: PlayerSkill): { player?: Character; error?: string; parts: string[] } => {
   const mpDelta = skill.mpDelta ?? 0;
@@ -40,13 +40,23 @@ const applyOptionalDeltas = (player: Character, skill: PlayerSkill): { player?: 
   };
 };
 
-export const resolveSkillUse = (player: Character, enemy: Character, skill: PlayerSkill): SkillUseResult => {
+export const resolveSkillUse = (player: Character, enemy: Character, skill: PlayerSkill, rng: () => number = Math.random): SkillUseResult => {
   if (skill.kind === 'passive' || skill.timing === 'passive') {
     return { player, enemy, log: `${skill.name} 사용 실패: 패시브 스킬은 전투 큐에서 사용할 수 없습니다.` };
   }
 
   const deltaResult = applyOptionalDeltas(player, skill);
   if (deltaResult.error || !deltaResult.player) return { player, enemy, log: deltaResult.error ?? `${skill.name} 사용 실패` };
+
+  const judgement = resolveJudgement(player.stats, skill.judgeStat ?? 'none', skill.judgeBonus ?? 0, rng);
+
+  if (judgement.attempted && !judgement.success) {
+    return {
+      player,
+      enemy,
+      log: `${skill.name} 판정 실패: ${judgement.log}. 효과가 발동하지 않았습니다.`
+    };
+  }
 
   let nextPlayer = deltaResult.player;
   let nextEnemy = enemy;
@@ -67,7 +77,7 @@ export const resolveSkillUse = (player: Character, enemy: Character, skill: Play
     return {
       player: nextPlayer,
       enemy: nextEnemy,
-      log: `${skill.name} 사용: ${parts.length ? parts.join(', ') : '수치 효과 없음'}.${judgeText(skill)}`
+      log: `${skill.name} 사용: ${parts.length ? parts.join(', ') : '수치 효과 없음'}.${judgement.attempted ? judgementText(judgement.log) : ''}`
     };
   }
 
@@ -75,18 +85,18 @@ export const resolveSkillUse = (player: Character, enemy: Character, skill: Play
 
   if (skill.effectType === 'damage') {
     nextEnemy = { ...nextEnemy, hp: clamp(nextEnemy.hp - power, nextEnemy.derived.maxHP) };
-    return { player: nextPlayer, enemy: nextEnemy, log: `${skill.name} 사용: ${[...parts, `적에게 ${power} 피해`].join(', ')}. 기존 스킬 배율 방식으로 처리했습니다.${judgeText(skill)}` };
+    return { player: nextPlayer, enemy: nextEnemy, log: `${skill.name} 사용: ${[...parts, `적에게 ${power} 피해`].join(', ')}. 기존 스킬 배율 방식으로 처리했습니다.${judgement.attempted ? judgementText(judgement.log) : ''}` };
   }
 
   if (skill.effectType === 'heal') {
     const beforeHp = nextPlayer.hp;
     nextPlayer = { ...nextPlayer, hp: clamp(nextPlayer.hp + power, nextPlayer.derived.maxHP) };
-    return { player: nextPlayer, enemy: nextEnemy, log: `${skill.name} 사용: ${[...parts, `플레이어 HP를 ${nextPlayer.hp - beforeHp} 회복`].join(', ')}. 기존 스킬 배율 방식으로 처리했습니다.${judgeText(skill)}` };
+    return { player: nextPlayer, enemy: nextEnemy, log: `${skill.name} 사용: ${[...parts, `플레이어 HP를 ${nextPlayer.hp - beforeHp} 회복`].join(', ')}. 기존 스킬 배율 방식으로 처리했습니다.${judgement.attempted ? judgementText(judgement.log) : ''}` };
   }
 
   if (skill.effectType === 'guard') {
-    return { player: { ...nextPlayer, guarding: true }, enemy: nextEnemy, log: `${skill.name} 사용: ${[...parts, '방어 자세'].join(', ')}.${judgeText(skill)}` };
+    return { player: { ...nextPlayer, guarding: true }, enemy: nextEnemy, log: `${skill.name} 사용: ${[...parts, '방어 자세'].join(', ')}.${judgement.attempted ? judgementText(judgement.log) : ''}` };
   }
 
-  return { player: nextPlayer, enemy: nextEnemy, log: `${skill.name} 사용: ${parts.length ? parts.join(', ') : '원본 효과 확인 전이라 실제 효과 없음'}.${judgeText(skill)}` };
+  return { player: nextPlayer, enemy: nextEnemy, log: `${skill.name} 사용: ${parts.length ? parts.join(', ') : '원본 효과 확인 전이라 실제 효과 없음'}.${judgement.attempted ? judgementText(judgement.log) : ''}` };
 };

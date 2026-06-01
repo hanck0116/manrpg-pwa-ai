@@ -1,4 +1,5 @@
 import { resolveBasicAttack } from '../rules/combat';
+import { resolveSkillUse } from '../rules/skillCombat';
 import { resolveCounterReaction, resolveDodgeReaction, resolveGuardReaction } from '../rules/reaction';
 import { appendLog, type GameState, type QueuedAction } from '../state/gameState';
 
@@ -59,6 +60,31 @@ export const beginPlayerReaction = (state: GameState, attackLog: string, damage:
     },
     `${attackLog} 적 공격에 반응할 수 있습니다. 반응은 턴을 소모하지 않습니다.`
   );
+
+export const resolvePlayerReactionSkill = (state: GameState, skillId: string): GameState => {
+  if (state.phase !== 'player-reaction' || !state.pendingReaction) {
+    return appendLog(state, '반응 스킬은 플레이어 반응턴에서만 사용할 수 있습니다.');
+  }
+
+  const skill = state.skills.find((playerSkill) => playerSkill.id === skillId);
+
+  if (!skill || skill.timing !== 'reaction' || skill.kind === 'passive') {
+    return finishReaction(appendLog(state, '반응 스킬 사용 실패: 사용할 수 있는 반응 스킬이 아닙니다.'));
+  }
+
+  const result = resolveSkillUse(state.player, state.enemy, skill);
+
+  return finishReaction(
+    appendLog(
+      {
+        ...state,
+        player: result.player,
+        enemy: result.enemy
+      },
+      `반응 스킬 사용: ${result.log}`
+    )
+  );
+};
 
 export const resolvePlayerReaction = (state: GameState, reactionType: NonNullable<QueuedAction['reactionType']> | 'none'): GameState => {
   if (state.phase !== 'player-reaction' || !state.pendingReaction) {

@@ -274,7 +274,7 @@ describe('magicBook attempt cost', () => {
   });
 });
 
-describe('saveVersion 15', () => {
+describe('saveVersion 16', () => {
   it('round-trips latest reward item types and queued action fields', () => {
     const storage = new Map<string, string>();
     const localStorageStub = {
@@ -315,7 +315,7 @@ describe('saveVersion 15', () => {
       }
     };
 
-    expect(saveGameStub(state)).toContain('saveVersion 15');
+    expect(saveGameStub(state)).toContain('saveVersion 16');
     expect(loadGameStub().actionQueue[0]).toMatchObject(action);
     expect(loadGameStub().inventory.map((item) => item.type)).toEqual(['magicTicket', 'choice', 'multiItem']);
     expect(loadGameStub().pendingReaction).toMatchObject({ against: 'player', damage: 1 });
