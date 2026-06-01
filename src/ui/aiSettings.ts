@@ -47,7 +47,7 @@ export const renderAISettings = (): string => {
   <details class="panel ai-settings">
     <summary>AI 설정</summary>
     <div class="ai-status-list">
-      <span>현재 AI 사용 상태: <strong>${settings.enabled ? '사용' : '미사용'}</strong></span>
+      <span>AI 자동 GM 서술: <strong>${settings.enabled ? '사용' : '미사용'}</strong></span>
       <span>저장된 키: <strong>${savedKeyCount > 0 ? `${savedKeyCount}개 있음` : '없음'}</strong></span>
       <span>마지막 연결 테스트: <strong>${lastConnectionResult}</strong></span>
       <span>fallback: <strong>${lastFallbackStatus}</strong></span>
@@ -61,9 +61,10 @@ export const renderAISettings = (): string => {
     </div>
     <p class="muted">Provider 요약: ${providerSummary || '기록 없음'}</p>
     <p class="muted">비용은 문자 수 기반 대략 추정이며 실제 청구액과 다를 수 있습니다.</p>
+    <p class="muted">체크하면 주요 행동 후 AI가 상황을 자동으로 묘사합니다. AI는 규칙 판정과 수치를 변경하지 않습니다. API 비용이 발생할 수 있으므로 공개 테스트 중에는 사용량을 확인하세요.</p>
     <div class="setting-grid">
       <label>
-        AI 사용
+        AI 자동 GM 서술 사용
         <input type="checkbox" data-ai-enabled ${settings.enabled ? 'checked' : ''} />
       </label>
       <label>

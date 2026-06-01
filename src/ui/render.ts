@@ -19,7 +19,7 @@ import { applyFiveLevelPlus, canFinishLevelAllocation, finishLevelAllocation } f
 import { resolvePlayerReaction } from '../game/reactionFlow';
 import { createRewardOffer, claimSelectedRewards, toggleRewardSelection } from '../game/rewardFlow';
 import { advanceTurn, createNewBattleFromPlayer } from '../game/turn';
-import { fixedMap } from '../map/fixedMap';
+import { fixedMap, MAP_SIZE } from '../map/fixedMap';
 import { getMinimapSummary } from '../map/minimap';
 import { getDirectionLabel } from '../game/movement';
 import { loadGameStub, saveGameStub } from '../storage/save';
@@ -41,6 +41,9 @@ import {
   type AllocatableStatKey
 } from '../game/statAllocation';
 import type { Character, Direction, EquipmentSlot, GameState, QueuedAction } from '../state/gameState';
+
+type AppTab = 'battle' | 'sheet' | 'maintenance' | 'trial' | 'ai' | 'log';
+let activeTab: AppTab = 'battle';
 import { appendLog } from '../state/gameState';
 import { renderAISettings, setAIConnectionStatus, setAISettingsStatus } from './aiSettings';
 
@@ -140,29 +143,56 @@ const collectAISettings = (root: HTMLElement): Partial<AISettings> => {
   return nextSettings;
 };
 
-const buildNarrationPayload = (state: GameState): Record<string, unknown> => ({
-  summary: state.log.slice(-5).map((entry) => entry.message),
-  delta: {
-    phase: state.phase,
-    floor: state.floor
+const buildNarrationPayload = (state: GameState, reason = '수동 AI GM 묘사'): Record<string, unknown> => ({
+  summary: state.log.slice(-8).map((entry) => entry.message),
+  reason,
+  phase: state.phase,
+  floor: state.floor,
+  turn: state.turn,
+  player: {
+    hp: state.player.hp,
+    maxHP: state.player.derived.maxHP,
+    mp: state.player.mp,
+    maxMP: state.player.derived.maxMP,
+    position: state.player.position
   },
-  localResult: {
-    player: {
-      name: state.player.name,
-      hp: state.player.hp,
-      maxHP: state.player.derived.maxHP,
-      mp: state.player.mp,
-      maxMP: state.player.derived.maxMP,
-      position: state.player.position
-    },
-    enemy: {
-      name: state.enemy.name,
-      hp: state.enemy.hp,
-      maxHP: state.enemy.derived.maxHP,
-      position: state.enemy.position
-    }
-  }
+  enemy: {
+    hp: state.enemy.hp,
+    maxHP: state.enemy.derived.maxHP,
+    position: state.enemy.position
+  },
+  localResult: '로컬 규칙 처리가 완료된 결과이며 AI는 묘사만 한다.'
 });
+
+const preserveRuleStateWithAILogs = (baseState: GameState, narration: string, combatLog: string[] = []): GameState => ({
+  ...baseState,
+  log: appendAILogs(baseState, narration, combatLog).log
+});
+
+export async function applyStateWithAutoNarration(
+  nextState: GameState,
+  reason: string,
+  setState: (state: GameState) => void
+): Promise<void> {
+  setState(nextState);
+
+  if (!getAISettings().enabled) {
+    return;
+  }
+
+  try {
+    const response = await callLLM('narrate', buildNarrationPayload(nextState, reason));
+    setAIConnectionStatus(
+      response.meta?.fallback ? 'AI 자동 GM fallback 사용' : 'AI 자동 GM 묘사 생성 완료',
+      response.meta?.fallback ?? response.ui_tags.includes('fallback'),
+      response.meta
+    );
+    setState(preserveRuleStateWithAILogs(nextState, response.narration, response.combat_log));
+  } catch (error) {
+    setAIConnectionStatus('AI 자동 GM 호출 실패', true);
+    setState(appendLog(nextState, `AI 자동 GM 서술 실패: ${toErrorMessage(error)}. 로컬 규칙 결과는 유지됩니다.`));
+  }
+}
 
 const renderCharacterCard = (character: Character): string => `
   <section class="panel character ${character.kind}">
@@ -273,9 +303,9 @@ const renderLevelUpAllocationPanel = (state: GameState): string => {
 };
 
 const renderMap = (state: GameState): string => `
-  <section class="panel map-panel" aria-label="7x7 고정 맵">
-    <h2>7x7 고정 맵</h2>
-    <div class="map-grid">
+  <section class="panel map-panel" aria-label="11x11 고정 맵">
+    <h2>11x11 고정 맵</h2>
+    <div class="map-grid" style="--map-size: ${MAP_SIZE}">
       ${fixedMap
         .map((tile) => {
           const hasPlayer = state.player.position.x === tile.x && state.player.position.y === tile.y && state.player.hp > 0;
@@ -401,6 +431,7 @@ const renderInventorySummary = (state: GameState): string => {
       <details>
         <summary>정비용 인벤토리 (${state.inventory.length})</summary>
         <p class="muted">아이템 사용/판매와 장비 착용은 정비 단계에서만 가능합니다. 전투 중 장비 변경은 불가능합니다.</p>
+        <p class="muted">이번 층 마법서 무료 시도: ${state.magicBookAttempt.floor === state.floor && state.magicBookAttempt.freeUsed ? '사용 완료, 이후 1회 1코인' : '사용 가능'}</p>
         ${
           state.inventory.length === 0
             ? '<p class="muted">보유 아이템이 없습니다.</p>'
@@ -693,12 +724,125 @@ const renderActionButtons = (state: GameState): string => {
       <button type="button" class="finish-button" data-finish-turn ${finishDisabled}>턴 마무리</button>
       <button type="button" data-new-battle ${newBattleDisabled}>새 전투 시작</button>
       ${state.phase === 'enemy-main' ? '<p class="muted">적 메인턴은 자동 진행 대상입니다. 초기 선턴 등 예외 상황에서만 턴 마무리로 처리합니다.</p>' : ''}
-      <div class="save-grid">
-        <button type="button" data-save="save">저장</button>
-        <button type="button" data-save="load">불러오기</button>
-      </div>
     </section>
   `;
+};
+
+
+const renderEnemyCompact = (state: GameState): string => `
+  <section class="panel enemy-compact">
+    <h2>적 간단 시트</h2>
+    <dl>
+      <div><dt>이름</dt><dd>${state.enemy.name}</dd></div>
+      <div><dt>HP</dt><dd>${state.enemy.hp} / ${state.enemy.derived.maxHP}</dd></div>
+      <div><dt>위치</dt><dd>${state.enemy.position.x + 1}, ${state.enemy.position.y + 1}</dd></div>
+      <div><dt>공격력</dt><dd>${state.enemy.derived.attack}</dd></div>
+      <div><dt>상태</dt><dd>${state.enemy.guarding ? '방어 중' : '일반'}</dd></div>
+    </dl>
+  </section>
+`;
+
+const renderRecentLog = (state: GameState): string => `
+  <section class="panel log-panel compact">
+    <h2>최근 로그</h2>
+    <ol>${state.log.slice(-8).map((entry) => `<li><span>턴 ${entry.turn}</span>${entry.message}</li>`).join('')}</ol>
+  </section>
+`;
+
+const renderSavePanel = (): string => `
+  <section class="panel save-panel">
+    <h2>저장/불러오기</h2>
+    <div class="save-grid">
+      <button type="button" data-save="save">저장</button>
+      <button type="button" data-save="load">불러오기</button>
+    </div>
+  </section>
+`;
+
+const renderBattleTab = (state: GameState): string => `
+  <section class="tab-panel battle-layout" data-tab-panel="battle">
+    <div>
+      ${renderTurnStatus(state)}
+      ${renderMap(state)}
+      <section class="panel minimap"><h2>미니맵 요약</h2><p>${getMinimapSummary(state)}</p></section>
+      ${renderReactionPanel(state)}
+      ${renderActionQueue(state)}
+      ${renderActionButtons(state)}
+    </div>
+    <div>
+      ${renderKnownSkills(state)}
+      ${renderKnownSpells(state)}
+      ${renderBattleItems(state)}
+      ${renderEnemyCompact(state)}
+      ${renderRecentLog(state)}
+    </div>
+  </section>
+`;
+
+const renderSheetTab = (state: GameState): string => `
+  <section class="tab-panel" data-tab-panel="sheet">
+    ${renderCharacterCard(state.player)}
+    ${renderStatAllocationPanel(state)}
+    ${renderLevelUpAllocationPanel(state)}
+    ${renderKnownSkills(state)}
+    ${renderKnownSpells(state)}
+  </section>
+`;
+
+const renderMaintenanceTab = (state: GameState): string => `
+  <section class="tab-panel" data-tab-panel="maintenance">
+    <section class="panel"><h2>마법서 시도권</h2><p>이번 층 마법서 무료 시도: <strong>${state.magicBookAttempt.floor === state.floor && state.magicBookAttempt.freeUsed ? '사용 완료, 이후 1회 1코인' : '사용 가능'}</strong></p></section>
+    ${renderFloorClearPanel(state)}
+    ${renderRewardPanel(state)}
+    ${renderShopPanel(state)}
+    ${renderEquipmentPanel(state)}
+    ${renderInventorySummary(state)}
+    ${renderPendingChoicePanel(state)}
+    ${renderSavePanel()}
+  </section>
+`;
+
+const renderTrialTab = (): string => `
+  <section class="tab-panel" data-tab-panel="trial">
+    <section class="panel">
+      <h2>천사의 시련</h2>
+      <p>천사의 시련은 다음 단계에서 구현 예정입니다.</p>
+      <p class="muted">TODO: 나중에 특수 보상/선택권/시련 보상을 연결할 영역입니다. 이번 단계에서는 보스몹, 다중 적, 새 규칙을 만들지 않습니다.</p>
+    </section>
+  </section>
+`;
+
+const renderAITab = (): string => `<section class="tab-panel" data-tab-panel="ai">${renderAISettings()}</section>`;
+
+const renderLogTab = (state: GameState): string => `
+  <section class="tab-panel" data-tab-panel="log">
+    ${renderLog(state)}
+    ${renderDebugPanel()}
+  </section>
+`;
+
+const renderActiveTab = (state: GameState): string => {
+  if (activeTab === 'sheet') return renderSheetTab(state);
+  if (activeTab === 'maintenance') return renderMaintenanceTab(state);
+  if (activeTab === 'trial') return renderTrialTab();
+  if (activeTab === 'ai') return renderAITab();
+  if (activeTab === 'log') return renderLogTab(state);
+  return renderBattleTab(state);
+};
+
+const renderTabBar = (): string => {
+  const tabs: { id: AppTab; label: string }[] = [
+    { id: 'battle', label: '전투' },
+    { id: 'sheet', label: '시트지' },
+    { id: 'maintenance', label: '정비' },
+    { id: 'trial', label: '천사의 시련' },
+    { id: 'ai', label: 'AI' },
+    { id: 'log', label: '로그' }
+  ];
+
+  return `<nav class="tab-bar" aria-label="주요 탭">${tabs
+    .map((tab) => `<button type="button" data-tab="${tab.id}" class="${activeTab === tab.id ? 'active' : ''}">${tab.label}</button>`)
+    .join('')}</nav>`;
 };
 
 const template = (state: GameState): string => `
@@ -706,39 +850,11 @@ const template = (state: GameState): string => `
     <header class="hero">
       <p class="eyebrow">ManRPG 모바일 전투 시트</p>
       <h1>ManRPG PWA AI</h1>
-      <p>플레이어 1명과 적 1명이 고정 7x7 맵에서 전투하고, 규칙·판정·보상은 로컬에서 처리합니다.</p>
+      <p>플레이어 1명과 적 1명이 고정 11x11 맵에서 전투하고, 규칙·판정·보상은 로컬에서 처리합니다.</p>
     </header>
 
-    ${renderTurnStatus(state)}
-    ${renderStatAllocationPanel(state)}
-    ${renderLevelUpAllocationPanel(state)}
-    ${renderMap(state)}
-
-    <section class="status-grid">
-      ${renderCharacterCard(state.player)}
-      ${renderCharacterCard(state.enemy)}
-    </section>
-
-    <section class="panel minimap">
-      <h2>미니맵 요약</h2>
-      <p>${getMinimapSummary(state)}</p>
-    </section>
-
-    ${renderFloorClearPanel(state)}
-    ${renderRewardPanel(state)}
-    ${renderShopPanel(state)}
-    ${renderEquipmentPanel(state)}
-    ${renderInventorySummary(state)}
-    ${renderPendingChoicePanel(state)}
-    ${renderKnownSpells(state)}
-    ${renderKnownSkills(state)}
-    ${renderBattleItems(state)}
-    ${renderReactionPanel(state)}
-    ${renderActionQueue(state)}
-    ${renderActionButtons(state)}
-    ${renderAISettings()}
-    ${renderDebugPanel()}
-    ${renderLog(state)}
+    ${renderTabBar()}
+    ${renderActiveTab(state)}
   </main>
 `;
 
@@ -781,10 +897,21 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const confirmChoiceId = target.dataset.confirmChoice;
     const reaction = target.dataset.reaction as 'dodge' | 'guard' | 'counter' | 'none' | undefined;
     const debugAction = target.dataset.debugAction;
+    const tab = target.dataset.tab as AppTab | undefined;
+
+    const setStateWithAuto = async (nextState: GameState, reason: string): Promise<void> => {
+      await applyStateWithAutoNarration(nextState, reason, setState);
+    };
 
     const logError = (error: unknown): void => {
       setState(appendLog(getState(), `오류: ${toErrorMessage(error)}`));
     };
+
+    if (tab) {
+      activeTab = tab;
+      render(root, getState());
+      return;
+    }
 
     if (debugAction) {
       try {
@@ -964,7 +1091,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     }
 
     if (reaction) {
-      setState(resolvePlayerReaction(getState(), reaction));
+      await setStateWithAuto(resolvePlayerReaction(getState(), reaction), '반응턴 처리 후');
       return;
     }
 
@@ -994,7 +1121,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     }
 
     if (target.dataset.clearFloor !== undefined) {
-      setState(createRewardOffer(applyFiveLevelPlus(clearFloorRecovery(getState()))));
+      await setStateWithAuto(createRewardOffer(applyFiveLevelPlus(clearFloorRecovery(getState()))), '보상 후보 생성 후');
       return;
     }
 
@@ -1009,7 +1136,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     }
 
     if (useItemId) {
-      setState(useInventoryItem(getState(), useItemId));
+      await setStateWithAuto(useInventoryItem(getState(), useItemId), '마법서 또는 인벤토리 사용 후');
       return;
     }
 
@@ -1019,17 +1146,17 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     }
 
     if (unequipSlot) {
-      setState(unequipItem(getState(), unequipSlot));
+      await setStateWithAuto(unequipItem(getState(), unequipSlot), '장비 해제 후');
       return;
     }
 
     if (buyShopItemId) {
-      setState(buyShopItem(getState(), buyShopItemId));
+      await setStateWithAuto(buyShopItem(getState(), buyShopItemId), '상점 구매 후');
       return;
     }
 
     if (confirmChoiceId) {
-      setState(confirmPendingChoice(getState(), confirmChoiceId));
+      await setStateWithAuto(confirmPendingChoice(getState(), confirmChoiceId), '선택권 처리 후');
       return;
     }
 
@@ -1039,12 +1166,12 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     }
 
     if (target.dataset.claimRewards !== undefined) {
-      setState(claimSelectedRewards(getState()));
+      await setStateWithAuto(claimSelectedRewards(getState()), '보상 확정 후');
       return;
     }
 
     if (target.dataset.enterNextFloor !== undefined) {
-      setState(enterNextFloor(getState()));
+      await setStateWithAuto(enterNextFloor(getState()), '다음 층 진입 후');
       return;
     }
 
@@ -1085,7 +1212,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     if (target.dataset.createSkill !== undefined) {
       const effectType = getInputValue(root, '[data-skill-effect]') as 'damage' | 'heal' | 'guard' | 'todo';
       const targetType = effectType === 'damage' ? 'enemy' : 'self';
-      setState(
+      await setStateWithAuto(
         addPlayerSkill(getState(), {
           name: getInputValue(root, '[data-skill-name]'),
           description: getInputValue(root, '[data-skill-description]'),
@@ -1095,7 +1222,8 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
           target: targetType,
           multiplier: Number(getInputValue(root, '[data-skill-multiplier]') || 1),
           source: 'user'
-        })
+        }),
+        '스킬 생성 후'
       );
       return;
     }
@@ -1124,14 +1252,14 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     }
 
     if (target.dataset.finishTurn !== undefined) {
-      setState(advanceTurn(getState()));
+      await setStateWithAuto(advanceTurn(getState()), '턴 마무리 후');
       return;
     }
 
     if (target.dataset.newBattle !== undefined) {
       const currentState = getState();
 
-      setState(createNewBattleFromPlayer(currentState));
+      await setStateWithAuto(createNewBattleFromPlayer(currentState), '새 전투 시작 후');
       return;
     }
 

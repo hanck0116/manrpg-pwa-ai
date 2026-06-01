@@ -39,9 +39,44 @@ button:active {
 }
 
 .app-shell {
-  width: min(100%, 44rem);
+  width: min(100%, 72rem);
   margin: 0 auto;
-  padding: 0.75rem;
+  padding: 0.5rem;
+}
+
+.tab-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.35rem;
+  padding: 0.4rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0.5rem;
+  background: rgba(22, 24, 33, 0.96);
+}
+
+.tab-bar button {
+  min-height: 38px;
+  padding: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.tab-bar button.active {
+  outline: 2px solid #f7c873;
+}
+
+.battle-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+@media (min-width: 900px) {
+  .battle-layout {
+    grid-template-columns: 1.2fr 0.8fr;
+  }
 }
 
 .hero,
@@ -76,15 +111,15 @@ button:active {
 }
 
 .panel {
-  padding: 0.85rem;
-  margin-bottom: 0.75rem;
+  padding: 0.65rem;
+  margin-bottom: 0.5rem;
 }
 
 .map-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.35rem;
-  width: min(100%, 24rem);
+  grid-template-columns: repeat(var(--map-size), minmax(0, 1fr));
+  gap: 0.2rem;
+  width: min(100%, 28rem);
   margin: 0 auto;
 }
 
@@ -196,6 +231,21 @@ button:active {
   padding-left: 1.25rem;
   max-height: 18rem;
   overflow: auto;
+}
+
+.log-panel.compact ol {
+  max-height: 9rem;
+}
+
+.enemy-compact dl {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.enemy-compact div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .log-panel span {

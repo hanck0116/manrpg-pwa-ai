@@ -15,8 +15,9 @@ import {
   type RewardState
 } from '../state/gameState';
 
-export const SAVE_KEY = 'manrpg-pwa-ai:save:v12';
+export const SAVE_KEY = 'manrpg-pwa-ai:save:v13';
 export const LEGACY_SAVE_KEYS = [
+  'manrpg-pwa-ai:save:v12',
   'manrpg-pwa-ai:save:v11',
   'manrpg-pwa-ai:save:v10',
   'manrpg-pwa-ai:save:v9',
@@ -29,7 +30,7 @@ export const LEGACY_SAVE_KEYS = [
   'manrpg-pwa-ai:save:v2',
   'manrpg-pwa-ai:save:v1'
 ];
-const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 
 type SavePayload = {
   saveVersion: number;
@@ -265,6 +266,9 @@ const isValidPendingChoice = (value: unknown): value is PendingChoice => {
   );
 };
 
+const isValidMagicBookAttempt = (value: unknown): value is GameState['magicBookAttempt'] =>
+  isObject(value) && isNumber(value.floor) && typeof value.freeUsed === 'boolean';
+
 const isValidGameState = (value: unknown): value is GameState => {
   if (!isObject(value)) {
     return false;
@@ -291,6 +295,7 @@ const isValidGameState = (value: unknown): value is GameState => {
     Array.isArray(value.skills) &&
     value.skills.every(isValidPlayerSkill) &&
     isValidEquipmentLoadout(value.equipment) &&
+    isValidMagicBookAttempt(value.magicBookAttempt) &&
     (value.rewardState === undefined || isValidRewardState(value.rewardState)) &&
     (value.pendingReaction === undefined || isValidPendingReaction(value.pendingReaction)) &&
     (value.pendingChoice === undefined || isValidPendingChoice(value.pendingChoice))
@@ -320,7 +325,7 @@ export const saveGameStub = (state: GameState): string => {
 
   localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
 
-  return `저장: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리, 보유 마법, 스킬, 장비를 localStorage에 기록했습니다.`;
+  return `저장: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리, 보유 마법, 스킬, 장비, 마법서 시도권을 localStorage에 기록했습니다.`;
 };
 
 export const loadGameStub = (): GameState => {
