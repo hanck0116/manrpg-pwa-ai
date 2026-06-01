@@ -39,12 +39,12 @@ export const enterNextFloor = (state: GameState): GameState => {
     floor: state.floor + 1,
     player: {
       ...state.player,
-      position: { x: 3, y: 5 },
+      position: { x: 5, y: 9 },
       guarding: false
     },
     enemy: {
       ...enemy,
-      position: { x: 3, y: 1 }
+      position: { x: 5, y: 1 }
     }
   };
   const initiative = getInitiative(positionedState);
@@ -60,8 +60,12 @@ export const enterNextFloor = (state: GameState): GameState => {
       actionQueue: [],
       turnOwner: initiative,
       rewardState: undefined,
-      battleResult: undefined
+      battleResult: undefined,
+      magicBookAttempt: {
+        floor: state.floor + 1,
+        freeUsed: false
+      }
     },
-    '다음 층에 진입했습니다. 적은 1명입니다.'
+    '다음 층에 진입했습니다. 11x11 고정 맵을 유지하며 적은 1명입니다.'
   );
 };

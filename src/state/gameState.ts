@@ -188,6 +188,10 @@ export type GameState = {
   battleResult?: BattleResult;
   pendingReaction?: PendingReaction;
   pendingChoice?: PendingChoice;
+  magicBookAttempt: {
+    floor: number;
+    freeUsed: boolean;
+  };
 };
 
 export const createCharacter = (
@@ -212,7 +216,7 @@ export const createInitialEnemy = (): Character =>
     id: 'enemy-1',
     name: '훈련용 고블린',
     kind: 'enemy',
-    position: { x: 3, y: 1 },
+    position: { x: 5, y: 1 },
     stats: {
       level: 1,
       strength: 1,
@@ -235,7 +239,7 @@ export const createInitialGameState = (): GameState => {
     id: 'player-1',
     name: '새 캐릭터',
     kind: 'player',
-    position: { x: 3, y: 5 },
+    position: { x: 5, y: 9 },
     stats: {
       level: 1,
       strength: 1,
@@ -265,7 +269,7 @@ export const createInitialGameState = (): GameState => {
     log: [
       {
         turn: 1,
-        message: `고정 7x7 맵에 플레이어 1명과 적 1명이 배치되었습니다. 캐릭터 생성에서 총 스탯 60이 되도록 54포인트를 분배하세요. 선턴: ${initiative === 'player' ? '플레이어' : '적'}`
+        message: `고정 11x11 맵에 플레이어 1명과 적 1명이 배치되었습니다. 캐릭터 생성에서 총 스탯 60이 되도록 54포인트를 분배하세요. 선턴: ${initiative === 'player' ? '플레이어' : '적'}`
       }
     ],
     selectedAction: '대기',
@@ -277,7 +281,11 @@ export const createInitialGameState = (): GameState => {
     inventory: [],
     spells: [],
     skills: [],
-    equipment: {}
+    equipment: {},
+    magicBookAttempt: {
+      floor: 1,
+      freeUsed: false
+    }
   };
 };
 

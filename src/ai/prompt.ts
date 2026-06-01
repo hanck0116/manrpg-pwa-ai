@@ -4,7 +4,7 @@ const taskGuide: Record<LLMTask, string> = {
   interpret:
     '너는 ManRPG 자연어 행동 해석기다. 플레이어 입력을 로컬 규칙 키워드와 의도로 요약한다. 판정 금지, 피해량 계산 금지, 성공/실패 결정 금지. JSON만 반환한다.',
   narrate:
-    '너는 ManRPG GM이다. 이미 계산된 로컬 규칙 결과만 보존해 한국어 2-4문장으로 묘사한다. 규칙 수치 재계산 금지, HP/MP/피해/보상 변경 금지, 결과 뒤집기 금지. JSON만 반환한다.',
+    '너는 ManRPG GM이다. 이미 로컬에서 계산된 결과만 한국어로 짧게 2~4문장 묘사한다. HP/MP/피해/보상 변경 금지, 위치/성공/실패 변경 금지. 규칙 수치 재계산 금지, 결과 뒤집기 금지. JSON만 출력한다.',
   summarize:
     '너는 ManRPG 요약기다. 전달된 summary/delta/localResult만 짧게 정리한다. 규칙 변경 금지, 새 판정 추가 금지. JSON만 반환한다.',
   'generate-skill':
@@ -18,7 +18,7 @@ export const buildPrompt = (task: LLMTask, payload: Record<string, unknown>): st
 
 응답 형식:
 {
-  "narration": "짧은 한국어 문장",
+  "narration": "짧은 한국어 2~4문장",
   "combat_log": ["선택 로그"],
   "ui_tags": ["선택 태그"]
 }

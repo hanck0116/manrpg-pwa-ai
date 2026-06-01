@@ -164,7 +164,84 @@ describe('inventory and shop', () => {
   });
 });
 
-describe('saveVersion 12', () => {
+describe('magicBook attempt cost', () => {
+  it('uses the first floor attempt for free and keeps the book on failure', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const item = makeItem('기초 마법서');
+    const state = {
+      ...withCoin(maintenanceState(), 0),
+      inventory: [item],
+      player: {
+        ...maintenanceState().player,
+        stats: { ...maintenanceState().player.stats, wisdom: 0, coin: 0 }
+      }
+    };
+
+    const next = useInventoryItem(state, item.id);
+
+    expect(next.magicBookAttempt).toEqual({ floor: 1, freeUsed: true });
+    expect(next.player.stats.coin).toBe(0);
+    expect(next.inventory).toHaveLength(1);
+    vi.restoreAllMocks();
+  });
+
+  it('charges 1 coin from the second attempt on the same floor', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const item = makeItem('기초 마법서');
+    const state = {
+      ...withCoin(maintenanceState(), 2),
+      magicBookAttempt: { floor: 1, freeUsed: true },
+      inventory: [item],
+      player: {
+        ...maintenanceState().player,
+        stats: { ...maintenanceState().player.stats, wisdom: 0, coin: 2 }
+      }
+    };
+
+    const next = useInventoryItem(state, item.id);
+
+    expect(next.player.stats.coin).toBe(1);
+    expect(next.inventory).toHaveLength(1);
+    vi.restoreAllMocks();
+  });
+
+  it('blocks a paid attempt without coins before rolling', () => {
+    const item = makeItem('기초 마법서');
+    const state = {
+      ...withCoin(maintenanceState(), 0),
+      magicBookAttempt: { floor: 1, freeUsed: true },
+      inventory: [item]
+    };
+
+    const next = useInventoryItem(state, item.id);
+
+    expect(next.player.stats.coin).toBe(0);
+    expect(next.inventory).toHaveLength(1);
+    expect(next.log.at(-1)?.message).toContain('1코인이 필요합니다');
+    vi.restoreAllMocks();
+  });
+
+  it('removes the magic book on success', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const item = makeItem('기초 마법서');
+    const state = {
+      ...maintenanceState(),
+      inventory: [item],
+      player: {
+        ...maintenanceState().player,
+        stats: { ...maintenanceState().player.stats, wisdom: 99 }
+      }
+    };
+
+    const next = useInventoryItem(state, item.id);
+
+    expect(next.inventory).toHaveLength(0);
+    expect(next.spells).toHaveLength(1);
+    vi.restoreAllMocks();
+  });
+});
+
+describe('saveVersion 13', () => {
   it('round-trips latest reward item types and queued action fields', () => {
     const storage = new Map<string, string>();
     const localStorageStub = {
@@ -205,7 +282,7 @@ describe('saveVersion 12', () => {
       }
     };
 
-    expect(saveGameStub(state)).toContain('saveVersion 12');
+    expect(saveGameStub(state)).toContain('saveVersion 13');
     expect(loadGameStub().actionQueue[0]).toMatchObject(action);
     expect(loadGameStub().inventory.map((item) => item.type)).toEqual(['magicTicket', 'choice', 'multiItem']);
     expect(loadGameStub().pendingReaction).toMatchObject({ against: 'player', damage: 1 });

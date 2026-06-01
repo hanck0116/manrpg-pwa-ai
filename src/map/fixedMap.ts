@@ -7,16 +7,20 @@ export type MapTile = {
 };
 
 const layout: TileType[][] = [
-  ['wall', 'wall', 'wall', 'wall', 'wall', 'wall', 'wall'],
-  ['wall', 'floor', 'floor', 'enemy', 'floor', 'floor', 'wall'],
-  ['wall', 'floor', 'wall', 'floor', 'wall', 'floor', 'wall'],
-  ['wall', 'floor', 'floor', 'floor', 'floor', 'floor', 'wall'],
-  ['wall', 'floor', 'wall', 'floor', 'wall', 'floor', 'wall'],
-  ['wall', 'floor', 'floor', 'start', 'floor', 'floor', 'wall'],
-  ['wall', 'wall', 'wall', 'wall', 'wall', 'wall', 'wall']
+  ['wall', 'wall', 'wall', 'wall', 'wall', 'wall', 'wall', 'wall', 'wall', 'wall', 'wall'],
+  ['wall', 'floor', 'floor', 'floor', 'wall', 'enemy', 'floor', 'floor', 'floor', 'floor', 'wall'],
+  ['wall', 'floor', 'wall', 'floor', 'wall', 'floor', 'wall', 'floor', 'wall', 'floor', 'wall'],
+  ['wall', 'floor', 'wall', 'floor', 'floor', 'floor', 'wall', 'floor', 'wall', 'floor', 'wall'],
+  ['wall', 'floor', 'floor', 'floor', 'wall', 'floor', 'floor', 'floor', 'floor', 'floor', 'wall'],
+  ['wall', 'wall', 'wall', 'floor', 'wall', 'floor', 'wall', 'wall', 'wall', 'floor', 'wall'],
+  ['wall', 'floor', 'floor', 'floor', 'floor', 'floor', 'floor', 'floor', 'wall', 'floor', 'wall'],
+  ['wall', 'floor', 'wall', 'wall', 'wall', 'floor', 'wall', 'floor', 'wall', 'floor', 'wall'],
+  ['wall', 'floor', 'floor', 'floor', 'wall', 'floor', 'wall', 'floor', 'floor', 'floor', 'wall'],
+  ['wall', 'floor', 'wall', 'floor', 'floor', 'start', 'floor', 'floor', 'wall', 'floor', 'wall'],
+  ['wall', 'wall', 'wall', 'wall', 'wall', 'wall', 'wall', 'wall', 'wall', 'wall', 'wall']
 ];
 
-export const MAP_SIZE = 7;
+export const MAP_SIZE = 11;
 
 export const fixedMap: MapTile[] = layout.flatMap((row, y) => row.map((type, x) => ({ x, y, type })));
 

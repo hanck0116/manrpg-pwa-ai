@@ -130,10 +130,35 @@ export const useInventoryItem = (state: GameState, itemId: string): GameState =>
   }
 
   if (item.type === 'magicBook') {
-    const result = tryLearnMagicBook(state.player.stats.wisdom, item.grade ?? '기초');
+    const currentAttempt = state.magicBookAttempt.floor === state.floor ? state.magicBookAttempt : { floor: state.floor, freeUsed: false };
+    let paidState: GameState = { ...state, magicBookAttempt: currentAttempt };
+
+    if (!currentAttempt.freeUsed) {
+      paidState = {
+        ...paidState,
+        magicBookAttempt: {
+          floor: state.floor,
+          freeUsed: true
+        }
+      };
+    } else {
+      if (state.player.stats.coin < 1) {
+        return appendLog(
+          paidState,
+          '마법서 습득 시도 실패: 이번 층의 무료 시도는 이미 사용했고, 1코인이 필요합니다.'
+        );
+      }
+
+      paidState = appendLog(
+        updatePlayerStats(paidState, (stats) => ({ ...stats, coin: stats.coin - 1 })),
+        '마법서 습득 시도 비용으로 1코인을 사용했습니다.'
+      );
+    }
+
+    const result = tryLearnMagicBook(paidState.player.stats.wisdom, item.grade ?? '기초');
 
     if (!result.success || !result.spell) {
-      return appendLog(state, `${result.message} 다시 시도할 수 있습니다.`);
+      return appendLog(paidState, `${result.message} 다시 시도할 수 있습니다.`);
     }
 
     const learnedSpell: LearnedSpell = {
@@ -146,8 +171,8 @@ export const useInventoryItem = (state: GameState, itemId: string): GameState =>
 
     return appendLog(
       {
-        ...removeItemWithoutLog(state, itemId),
-        spells: [...state.spells, learnedSpell]
+        ...removeItemWithoutLog(paidState, itemId),
+        spells: [...paidState.spells, learnedSpell]
       },
       `마법서 사용: ${result.message}`
     );
