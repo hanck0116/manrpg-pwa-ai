@@ -46,7 +46,7 @@ const applyIncomingDamage = (state: GameState, damage: number, log: string): Gam
     log
   );
 
-export const beginPlayerReaction = (state: GameState, attackLog: string, damage: number): GameState =>
+export const beginPlayerReaction = (state: GameState, attackLog: string, damage: number, sourceType: NonNullable<GameState['pendingReaction']>['sourceType'] = 'basic'): GameState =>
   appendLog(
     {
       ...state,
@@ -55,7 +55,8 @@ export const beginPlayerReaction = (state: GameState, attackLog: string, damage:
       pendingReaction: {
         against: 'player',
         attackLog,
-        damage
+        damage,
+        sourceType
       }
     },
     `${attackLog} 적 공격에 반응할 수 있습니다. 반응은 턴을 소모하지 않습니다.`

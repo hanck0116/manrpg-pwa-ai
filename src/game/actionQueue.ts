@@ -1,3 +1,4 @@
+import { applyPendingAmplificationToDamage, applyPendingAmplificationToHeal, hasActiveDesireCost, noteAmplificationNotApplicable } from './halo';
 import { useBattleInventoryItem } from './inventory';
 import { moveCharacterSteps } from './movement';
 import { resolveBasicAttack } from '../rules/combat';
@@ -58,6 +59,10 @@ export const enqueueAction = (state: GameState, action: QueuedAction): GameState
     return appendLog(state, '플레이어 메인턴에만 행동을 큐에 추가할 수 있습니다.');
   }
 
+  if (hasActiveDesireCost(state) && action.type !== 'wait') {
+    return appendLog(state, '욕망의 대가로 행동 불능 상태입니다. 턴 마무리 또는 대기만 가능합니다.');
+  }
+
   if (state.player.hp <= 0) {
     return appendLog(state, '플레이어가 쓰러진 상태라 행동을 추가할 수 없습니다.');
   }
@@ -109,7 +114,7 @@ const executeSpellAction = (state: GameState, action: QueuedAction): GameState =
 
   const result = resolveSpellCast(state.player, state.enemy, spell);
 
-  return appendLog(
+  const nextState = appendLog(
     {
       ...state,
       player: result.caster.kind === 'player' ? result.caster : state.player,
@@ -117,6 +122,8 @@ const executeSpellAction = (state: GameState, action: QueuedAction): GameState =
     },
     result.log
   );
+
+  return applyPendingAmplificationToDamage(nextState);
 };
 
 
@@ -133,14 +140,17 @@ const executeTechniqueAction = (state: GameState, action: QueuedAction): GameSta
 
   const result = resolveTechniqueUse(state.player, state.enemy, technique);
 
-  return appendLog(
+  const nextState = appendLog(
     {
       ...state,
       player: result.player,
-      enemy: result.enemy
+      enemy: result.enemy,
+      techniques: technique.source === 'halo:fusion' ? state.techniques.filter((known) => known.id !== technique.id) : state.techniques
     },
     result.log
   );
+
+  return technique.kind === 'heal' ? applyPendingAmplificationToHeal(nextState) : applyPendingAmplificationToDamage(nextState);
 };
 
 const executeItemAction = (state: GameState, action: QueuedAction): GameState => {
@@ -168,7 +178,7 @@ const executeSkillAction = (state: GameState, action: QueuedAction): GameState =
 
   const result = resolveSkillUse(state.player, state.enemy, skill);
 
-  return appendLog(
+  const nextState = appendLog(
     {
       ...state,
       player: result.player,
@@ -176,6 +186,8 @@ const executeSkillAction = (state: GameState, action: QueuedAction): GameState =
     },
     result.log
   );
+
+  return skill.effectType === 'heal' ? applyPendingAmplificationToHeal(nextState) : skill.effectType === 'damage' ? applyPendingAmplificationToDamage(nextState) : nextState;
 };
 
 const executeQueuedAction = (state: GameState, action: QueuedAction): GameState => {
@@ -192,25 +204,29 @@ const executeQueuedAction = (state: GameState, action: QueuedAction): GameState 
 
   switch (action.type) {
     case 'move':
-      return moveCharacterSteps(baseState, baseState.player.id, action.direction ?? 'up', action.steps ?? 1);
+      return noteAmplificationNotApplicable(moveCharacterSteps(baseState, baseState.player.id, action.direction ?? 'up', action.steps ?? 1));
     case 'basic-attack': {
       const result = resolveBasicAttack(baseState.player, baseState.enemy);
 
-      return appendLog(
-        {
-          ...baseState,
-          enemy: { ...baseState.enemy, hp: result.targetHp }
-        },
-        result.log
+      return applyPendingAmplificationToDamage(
+        appendLog(
+          {
+            ...baseState,
+            enemy: { ...baseState.enemy, hp: result.targetHp }
+          },
+          result.log
+        )
       );
     }
     case 'defend':
-      return appendLog(
-        {
-          ...baseState,
-          player: { ...baseState.player, guarding: true }
-        },
-        '플레이어가 방어 자세를 취했습니다.'
+      return noteAmplificationNotApplicable(
+        appendLog(
+          {
+            ...baseState,
+            player: { ...baseState.player, guarding: true }
+          },
+          '플레이어가 방어 자세를 취했습니다.'
+        )
       );
     case 'skill':
       return executeSkillAction(baseState, action);
@@ -221,7 +237,7 @@ const executeQueuedAction = (state: GameState, action: QueuedAction): GameState 
     case 'item':
       return executeItemAction(baseState, action);
     case 'wait':
-      return appendLog(baseState, '플레이어가 대기했습니다.');
+      return noteAmplificationNotApplicable(appendLog(baseState, '플레이어가 대기했습니다.'));
   }
 };
 

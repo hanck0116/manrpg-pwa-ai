@@ -39,7 +39,6 @@ const SWORD_KI_TABLE: Record<SwordKiLevel, SwordKiConfig> = {
 const attackTraitMultipliers: Record<string, number> = {
   연혼염: 1.15,
   '흑염의 영체화': 1.1,
-  헤일로: 1.25,
   입천: 1.3,
   '앙케 라': 1.5
 };

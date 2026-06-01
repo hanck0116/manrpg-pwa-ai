@@ -1,4 +1,5 @@
 import { executeActionQueue } from './actionQueue';
+import { tickPlayerControlStatuses } from './halo';
 import { runEnemyMainTurn } from './enemyAI';
 import { resolvePlayerReaction } from './reactionFlow';
 import { appendLog, createInitialEnemy, type Character, type GameState } from '../state/gameState';
@@ -161,7 +162,7 @@ export const finishPlayerMainTurn = (state: GameState): GameState => {
     return endedAfterActions;
   }
 
-  const recoveredState = recoverPlayerMp(endedAfterActions);
+  const recoveredState = tickPlayerControlStatuses(recoverPlayerMp(endedAfterActions));
 
   return runAutomaticEnemyTurn(recoveredState);
 };

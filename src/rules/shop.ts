@@ -30,7 +30,7 @@ export const getShopItems = (): ShopItem[] => SHOP_BUY_LIST;
 export const canBuyShopItem = (state: GameState, shopItemId: string): boolean => {
   const item = SHOP_BUY_LIST.find((shopItem) => shopItem.id === shopItemId);
 
-  return Boolean(item) && maintenanceShopPhases.includes(state.phase) && state.player.stats.coin >= (item?.price ?? Infinity);
+  return Boolean(item) && maintenanceShopPhases.includes(state.phase) && state.player.stats.coin >= (item?.price ?? Number.MAX_SAFE_INTEGER);
 };
 
 const toRewardItem = (shopItem: ShopItem): RewardItem => {

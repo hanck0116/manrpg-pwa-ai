@@ -45,6 +45,6 @@ describe('trait derived stats refinement', () => {
 
   it('applies implemented attack multiplier traits', () => {
     const base = deriveWithTraits([]);
-    expect(deriveWithTraits(['연혼염', '흑염의 영체화', '헤일로', '입천', '앙케 라']).attack).toBeGreaterThan(base.attack);
+    expect(deriveWithTraits(['연혼염', '흑염의 영체화', '입천', '앙케 라']).attack).toBeGreaterThan(base.attack);
   });
 });
