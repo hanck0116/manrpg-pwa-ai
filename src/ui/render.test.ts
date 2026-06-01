@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { bindUI, applyStateWithAutoNarration, render } from './render';
 import { createInitialGameState, type GameState } from '../state/gameState';
+import { createPlayerSkill } from '../rules/skill';
 import { setAISettings } from '../ai/settings';
 
 vi.mock('../ai/router', () => ({
@@ -105,6 +106,40 @@ describe('technique UI', () => {
 
     expect(root.innerHTML).toContain('보유 기술');
     expect(root.innerHTML).toContain('<option value=\"공법\">공법</option>');
+    vi.unstubAllGlobals();
+  });
+});
+
+
+describe('reaction skill UI', () => {
+  it('shows reaction skill buttons during player reaction', async () => {
+    class TestButton {
+      dataset: Record<string, string>;
+      constructor(dataset: Record<string, string>) {
+        this.dataset = dataset;
+      }
+    }
+    vi.stubGlobal('HTMLButtonElement', TestButton);
+    const { root, getClickHandler } = makeRoot();
+    const skill = createPlayerSkill({ name: '반응기', resourceType: 'none', timing: 'reaction', effectType: 'damage', multiplier: 1 });
+    let state: GameState = {
+      ...createInitialGameState(),
+      setupMode: false,
+      phase: 'player-reaction' as const,
+      pendingReaction: { against: 'player' as const, attackLog: '적 공격', damage: 1 },
+      skills: [skill]
+    };
+    const setState = (next: GameState): void => {
+      state = next;
+      render(root, state);
+    };
+
+    render(root, state);
+    bindUI(root, () => state, setState);
+    await getClickHandler()({ target: new TestButton({ tab: 'battle' }) });
+
+    expect(root.innerHTML).toContain('data-reaction-skill');
+    expect(root.innerHTML).toContain('반응기');
     vi.unstubAllGlobals();
   });
 });

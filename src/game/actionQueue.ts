@@ -67,6 +67,9 @@ export const enqueueAction = (state: GameState, action: QueuedAction): GameState
     if (skill?.kind === 'passive' || skill?.timing === 'passive') {
       return appendLog(state, '패시브 스킬은 전투 큐에 추가할 수 없습니다.');
     }
+    if (skill?.timing === 'reaction') {
+      return appendLog(state, '반응 스킬은 행동 큐가 아니라 반응턴에서 즉시 사용합니다.');
+    }
   }
 
   if (action.type === 'basic-attack' && state.enemy.hp <= 0) {

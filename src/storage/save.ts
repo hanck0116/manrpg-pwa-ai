@@ -1,5 +1,6 @@
 import { calcDerivedStats } from '../rules/derivedStats';
 import { applyEquipmentBonuses } from '../rules/equipment';
+import { applyPassiveSkillStats } from '../rules/passiveSkill';
 import {
   createInitialGameState,
   type Character,
@@ -16,8 +17,9 @@ import {
   type RewardState
 } from '../state/gameState';
 
-export const SAVE_KEY = 'manrpg-pwa-ai:save:v15';
+export const SAVE_KEY = 'manrpg-pwa-ai:save:v16';
 export const LEGACY_SAVE_KEYS = [
+  'manrpg-pwa-ai:save:v15',
   'manrpg-pwa-ai:save:v14',
   'manrpg-pwa-ai:save:v13',
   'manrpg-pwa-ai:save:v12',
@@ -33,7 +35,7 @@ export const LEGACY_SAVE_KEYS = [
   'manrpg-pwa-ai:save:v2',
   'manrpg-pwa-ai:save:v1'
 ];
-export const SAVE_VERSION = 15;
+export const SAVE_VERSION = 16;
 
 type SavePayload = {
   saveVersion: number;
@@ -351,10 +353,11 @@ const isValidGameState = (value: unknown): value is GameState => {
   );
 };
 
-const refreshCharacterDerived = (character: Character, equipment?: EquipmentLoadout): Character => {
+const refreshCharacterDerived = (character: Character, equipment?: EquipmentLoadout, skills: PlayerSkill[] = []): Character => {
+  const effectiveStats = character.kind === 'player' ? applyPassiveSkillStats(character.stats, skills) : character.stats;
   const refreshed = {
     ...character,
-    derived: calcDerivedStats(character.stats)
+    derived: calcDerivedStats(effectiveStats)
   };
 
   return equipment ? applyEquipmentBonuses(refreshed, equipment) : refreshed;
@@ -362,7 +365,7 @@ const refreshCharacterDerived = (character: Character, equipment?: EquipmentLoad
 
 const refreshDerivedStats = (state: GameState): GameState => ({
   ...state,
-  player: refreshCharacterDerived(state.player, state.equipment),
+  player: refreshCharacterDerived(state.player, state.equipment, state.skills),
   enemy: refreshCharacterDerived(state.enemy)
 });
 

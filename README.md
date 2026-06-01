@@ -197,9 +197,9 @@ npm run build
   - 계단 미구현 표시
 - 전투 로그 최근 20개 표시
 - 저장/불러오기
-  - `saveVersion: 15`
+  - `saveVersion: 16`
   - `floor`, `rewardState`, `inventory`, `spells`, `levelUpPending`, `pendingReaction`, `pendingChoice`를 포함한 현재 구조만 유효 저장으로 취급
-  - saveVersion 15가 아니거나 깨진 저장 데이터는 초기 상태로 복구
+  - saveVersion 16이 아니거나 깨진 저장 데이터는 초기 상태로 복구
   - actionQueue와 `spellId`/`itemId`/`reactionType` 저장/복구
 - 접이식 AI 설정 패널
 - Cloudflare Worker relay 1차
@@ -271,15 +271,15 @@ npm run build
 
 ## 아직 미구현/TODO
 
-- 일반 판정의 상황별 성공조건 정리
-- choice 선택권 실제 효과 구현
+- 일반 판정의 상황별 성공조건 정밀화
+- 기술 판정 실패 시 자원 소모 여부 원본 확인
+- 스킬 패시브 효과 종류 확장
 - 스킬 계산식 원본 정밀화
 - 장비 원본 목록/등급/가격 정밀화
-- 반응 스킬 실제 연결
 - 마법 특수 효과/상태이상 구현
 - 전투 중 실제 소모 아이템 추가
-- Worker 운영 안정화
-- provider별 사용량/비용 표시
+- Worker 자동 배포 workflow
+- provider별 실제 사용량 API 연동
 - UI 모바일 최종 정리
 - 배포 후 버그 수정
 
@@ -341,7 +341,7 @@ npm run build
 - `choice` 선택권은 1차 실제 효과를 구현했습니다. 50코인, 명확한 아이템/마법 티켓/특성 선택은 적용하고, 원본 효과가 불명확한 선택지는 아이템화하되 효과를 창작하지 않습니다.
 - 적의 인접 공격은 즉시 피해를 적용하지 않고 `player-reaction`으로 진입합니다. 회피/방어/카운터/반응 안 함은 행동 큐를 소모하지 않는 1차 구현입니다.
 - 플레이어의 방어 행동은 적의 다음 공격 1회 판정까지 유지되고, 공격/반응 처리 후 해제됩니다.
-- 저장 구조는 `saveVersion: 15`이며 `spellId`, `itemId`, `reactionType`, `pendingReaction`, `pendingChoice`, `magicTicket`, `choice`, `multiItem`을 검증합니다.
+- 저장 구조는 `saveVersion: 16`이며 `spellId`, `itemId`, `reactionType`, `pendingReaction`, `pendingChoice`, `magicTicket`, `choice`, `multiItem`을 검증합니다.
 - Vitest 기반 `npm run test`를 추가했습니다.
 
 검증:
@@ -353,7 +353,7 @@ npm run build
 
 현재 스킬은 원본 통합본에서 확인한 "스킬 피해 배수를 최종 공격 피해에 곱한다"는 방향만 1차로 반영했습니다. 원본에서 세부 산식이 확정되지 않은 효과는 임의로 확장하지 않고 TODO로 남깁니다.
 
-- 보유 스킬 구조가 `GameState.skills`에 추가되었고 현재 저장 구조는 `saveVersion: 15`입니다.
+- 보유 스킬 구조가 `GameState.skills`에 추가되었고 현재 저장 구조는 `saveVersion: 16`입니다.
 - 행동 큐의 스킬 행동은 `skillId`로 보유 스킬을 참조합니다.
 - 스킬 제작은 정비 단계(`floor-cleared`, `reward-pending`, `level-up-pending`, `battle-ended`)에서만 가능합니다.
 - 1차 피해 스킬은 외공/검기/마법/없음 계열의 기준값에 배율을 곱해 적 1명에게 적용합니다.
@@ -374,7 +374,7 @@ npm run build
 
 원본에는 `장비목록`과 장비/아이템 판매 흐름이 확인되지만, 슬롯형 장비의 확정 효과와 일반 보상/상점 등장 규칙은 아직 명확하지 않습니다. 그래서 이번 단계에서는 원본에 없는 효과를 만들지 않고, 보유/착용/해제/판매/파생 수치 반영 구조만 먼저 구현했습니다.
 
-- 저장 구조는 `saveVersion: 15`입니다.
+- 저장 구조는 `saveVersion: 16`입니다.
 - `GameState.equipment`에 `weapon`, `armor`, `accessory` 슬롯을 저장합니다.
 - `RewardItem.equipment`로 인벤토리 장비 아이템을 표현합니다.
 - 장비 착용/해제는 정비 단계(`floor-cleared`, `reward-pending`, `level-up-pending`, `battle-ended`)에서만 가능합니다.
@@ -391,17 +391,17 @@ npm run build
 - 착용 중 장비 판매/교체 UX 정리
 
 
-## 이번 단계 반영 사항 (saveVersion 15)
+## 이번 단계 반영 사항 (saveVersion 16)
 
 - 맵은 랜덤 생성 없이 항상 동일한 11x11 고정 맵입니다. 플레이어는 1명, 적은 1명이며 보스몹은 없습니다.
 - 마법서(`magicBook`) 습득 시도는 층마다 첫 1회 무료이고, 같은 층의 2번째 시도부터 1회당 1코인을 사용합니다. 코인이 없으면 시도하지 않으며, 실패한 마법서는 유지되고 다음 층 진입 시 무료 시도권이 초기화됩니다.
 - `AI 자동 GM 서술 사용`을 켜면 주요 행동 후 AI가 이미 계산된 로컬 결과를 짧게 묘사합니다. AI는 HP/MP/피해/보상/위치/스탯/인벤토리를 수정하지 않습니다.
 - 모바일 UI는 전투/시트지/정비/천사의 시련/AI/로그 탭으로 분리되었습니다. 천사의 시련은 원본 ANGEL_TABLE 기반 점수 보상 지급을 지원합니다.
-- 저장 키와 저장 구조는 `saveVersion 15`입니다.
+- 저장 키와 저장 구조는 `saveVersion 16`입니다.
 
-## 이번 단계 반영 사항 (saveVersion 15)
+## 이번 단계 반영 사항 (saveVersion 16)
 
-- 저장 키와 저장 구조는 `saveVersion 15`입니다. `angelTrial.claimedScores`, `angelTrial.lastScore`, `angelTrial.lastResult`를 저장/검증합니다.
+- 저장 키와 저장 구조는 `saveVersion 16`입니다. `angelTrial.claimedScores`, `angelTrial.lastScore`, `angelTrial.lastResult`를 저장/검증합니다.
 - 플레이어는 1명, 적은 1명이며 보스몹은 만들지 않습니다. 맵은 기존과 동일한 11x11 고정 맵을 유지하고 랜덤 맵을 만들지 않습니다.
 - 천사의 시련 탭은 실제 보상 지급을 지원합니다. 현재 기본 공격력 또는 직접 입력한 0 이상 정수 시련값으로 `ANGEL_TABLE`의 점수 이하 보상을 지급하며, 이미 획득한 단계는 중복 지급하지 않습니다.
 - 천사의 시련은 전투나 보스전이 아닙니다. 적 생성, 보스 생성, 다중 적 전투, AI 판정 없이 점수 기반 보상 처리만 수행합니다.
@@ -411,7 +411,7 @@ npm run build
 - 전투 탭은 빠르게 쓰도록 보유 스킬/큐 추가만 표시하고 스킬 생성 UI를 제거했습니다. 시트지 탭은 스킬 생성, 보유 마법, 장비 패널을 포함합니다.
 - AI 자동 GM 서술은 여전히 규칙 판정과 수치 변경에 관여하지 않으며, 천사의 시련 실행 후에도 묘사만 추가합니다.
 
-## saveVersion 15 변경 사항
+## saveVersion 16 변경 사항
 
 이번 단계에서도 플레이어는 1명, 적은 1명이며 보스몹은 없고 맵은 동일한 11x11 고정 맵입니다. 랜덤 맵, 다중 타겟, AI 판정/수치 변경은 추가하지 않았습니다.
 
@@ -422,4 +422,15 @@ npm run build
 - choice 제한 실패 또는 이미 보유한 특성 선택 시 source choice 아이템과 pendingChoice를 유지해 다른 선택지를 다시 고를 수 있습니다.
 - 특성 파생 수치 1차 정밀화로 심법/심적초월/시분할 및 안전한 공격 배수 특성을 반영했습니다.
 - 스킬 제작 UI와 `PlayerSkill` 저장 구조를 MP/HP 변화량, 공격 피해 배수, 판정 스탯/보정, 패시브 표시 필드까지 optional로 확장했습니다.
-- 저장 키는 `manrpg-pwa-ai:save:v15`, 저장 구조는 `saveVersion: 15`입니다.
+- 저장 키는 `manrpg-pwa-ai:save:v16`, 저장 구조는 `saveVersion: 16`입니다.
+
+## 2026-06-01 규칙 업데이트
+
+- 플레이어는 항상 1명, 적은 항상 1명이며 보스몹은 만들지 않습니다.
+- 맵은 동일한 11x11 고정 맵만 사용하며 랜덤 맵을 만들지 않습니다.
+- 일반 판정 1차를 추가했습니다. `judgeStat`이 `none`이 아니면 로컬 규칙 엔진이 `1d100 ≤ 스탯+보정`으로 성공/실패를 처리하고, 목표값은 1~95로 제한합니다.
+- AI와 Worker는 판정, 피해, 보상, HP/MP, 위치, 스탯, 인벤토리를 수정하지 않습니다. 모든 수치 변경은 로컬 TypeScript 규칙에서만 처리합니다.
+- 기술과 스킬은 MP/HP 사용 가능 여부를 먼저 확인한 뒤 판정을 수행합니다. 판정 실패 시 이번 1차 구현에서는 자원 소모 없이 효과가 발동하지 않습니다. 원본에서 실패 자원 소모가 명확한 경우는 추후 TODO로 정밀화합니다.
+- 패시브 스킬은 전투 큐에 들어가지 않으며, `passiveStat`/`passiveValue`가 임시 유효 스탯에 더해져 파생 수치 계산에 반영됩니다. `player.stats` 원본 값은 영구 변경하지 않습니다.
+- 반응 스킬은 `player-reaction` 단계의 반응 패널에서 즉시 사용합니다. 반응 스킬은 actionQueue에 넣지 않으며 사용 후 pendingReaction을 해소합니다.
+- 저장 키와 저장 버전은 `manrpg-pwa-ai:save:v16`, `saveVersion: 16`입니다. v15 이하 저장 키는 legacy key로 정리 대상에 포함합니다.
