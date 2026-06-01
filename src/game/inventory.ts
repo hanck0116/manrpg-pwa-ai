@@ -2,6 +2,7 @@ import { getMagicBookConfig, rollSpellFromGrade, SPELLS, tryLearnMagicBook } fro
 import { appendLog, type GameState, type LearnedSpell, type RewardItem } from '../state/gameState';
 import { refreshPlayer, updatePlayerStats } from './characterUpdate';
 import { equipItem } from './equipment';
+import { addTraitIfAllowed } from './rewardApply';
 
 const maintenancePhases: GameState['phase'][] = ['reward-pending', 'level-up-pending', 'floor-cleared', 'battle-ended'];
 
@@ -203,6 +204,27 @@ export const useInventoryItem = (state: GameState, itemId: string): GameState =>
 
   if (item.type === 'choice') {
     return createChoiceItemChoice(state, item);
+  }
+
+
+  if (item.type === 'trait') {
+    const applied = addTraitIfAllowed(state, item.name);
+
+    if (!applied.applied) {
+      return appendLog(state, applied.message);
+    }
+
+    if (state.player.stats.traits.includes(item.name)) {
+      return appendLog(state, '이미 보유한 특성입니다.');
+    }
+
+    return appendLog(
+      {
+        ...applied.state,
+        inventory: applied.state.inventory.filter((inventoryItem) => inventoryItem.id !== itemId)
+      },
+      `${applied.message} 아직 구현되지 않은 특성 효과는 TODO로 남깁니다.`
+    );
   }
 
   if (item.type === 'reset') {

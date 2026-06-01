@@ -22,7 +22,8 @@ const makeRoot = (): { root: HTMLElement; getClickHandler: () => ClickHandler } 
     innerHTML: '',
     addEventListener: (type: string, handler: ClickHandler) => {
       if (type === 'click') clickHandler = handler;
-    }
+    },
+    querySelector: () => null
   } as unknown as HTMLElement;
 
   return { root, getClickHandler: () => clickHandler };
@@ -56,6 +57,7 @@ describe('tab UI', () => {
     expect(root.innerHTML).toContain('11x11 고정 맵');
     expect(root.innerHTML).toContain('행동 추가');
     expect(root.innerHTML).toContain('보유 스킬');
+    expect(root.innerHTML).not.toContain('스킬 생성');
     expect(root.innerHTML).toContain('보유 마법');
     expect(root.innerHTML).toContain('적 간단 시트');
 
@@ -65,7 +67,14 @@ describe('tab UI', () => {
     expect(root.innerHTML).toContain('저장/불러오기');
 
     await getClickHandler()({ target: new TestButton({ tab: 'trial' }) });
-    expect(root.innerHTML).toContain('천사의 시련은 다음 단계에서 구현 예정입니다.');
+    expect(root.innerHTML).toContain('기본 공격값으로 시련 적용');
+    expect(root.innerHTML).toContain('data-angel-manual-score');
+
+    await getClickHandler()({ target: new TestButton({ tab: 'sheet' }) });
+    expect(root.innerHTML).toContain('스킬 생성');
+
+    await getClickHandler()({ target: new TestButton({ tab: 'ai' }) });
+    expect(root.innerHTML).toContain('<details class="panel ai-settings" open>');
     vi.unstubAllGlobals();
   });
 });

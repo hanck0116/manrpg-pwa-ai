@@ -167,6 +167,12 @@ export type PendingChoice = {
   options: PendingChoiceOption[];
 };
 
+export type AngelTrialState = {
+  claimedScores: number[];
+  lastScore?: number;
+  lastResult?: string;
+};
+
 export type GameState = {
   setupMode: boolean;
   levelUpPending: boolean;
@@ -192,6 +198,7 @@ export type GameState = {
     floor: number;
     freeUsed: boolean;
   };
+  angelTrial: AngelTrialState;
 };
 
 export const createCharacter = (
@@ -285,6 +292,9 @@ export const createInitialGameState = (): GameState => {
     magicBookAttempt: {
       floor: 1,
       freeUsed: false
+    },
+    angelTrial: {
+      claimedScores: []
     }
   };
 };
