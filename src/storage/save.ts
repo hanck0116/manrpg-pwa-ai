@@ -8,17 +8,21 @@ import {
   type EquipmentItem,
   type EquipmentLoadout,
   type GameState,
+  type HaloKind,
+  type HaloState,
   type LearnedSpell,
   type PendingChoice,
   type PendingChoiceOption,
   type PlayerSkill,
   type PlayerTechnique,
   type RewardItem,
-  type RewardState
+  type RewardState,
+  type StatusEffect
 } from '../state/gameState';
 
-export const SAVE_KEY = 'manrpg-pwa-ai:save:v16';
+export const SAVE_KEY = 'manrpg-pwa-ai:save:v17';
 export const LEGACY_SAVE_KEYS = [
+  'manrpg-pwa-ai:save:v16',
   'manrpg-pwa-ai:save:v15',
   'manrpg-pwa-ai:save:v14',
   'manrpg-pwa-ai:save:v13',
@@ -35,7 +39,7 @@ export const LEGACY_SAVE_KEYS = [
   'manrpg-pwa-ai:save:v2',
   'manrpg-pwa-ai:save:v1'
 ];
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
 
 type SavePayload = {
   saveVersion: number;
@@ -45,6 +49,9 @@ type SavePayload = {
 const validPhases = ['player-main', 'player-reaction', 'enemy-main', 'enemy-reaction', 'floor-cleared', 'reward-pending', 'level-up-pending', 'battle-ended'];
 const validRewardTypes: RewardItem['type'][] = ['coin', 'martial', 'magicBook', 'magicTicket', 'choice', 'multiItem', 'multi', 'reset', 'trait', 'special', 'item', 'equipment'];
 const validActionTypes = ['move', 'basic-attack', 'skill', 'spell', 'technique', 'item', 'defend', 'wait'];
+const validHaloKinds: HaloKind[] = ['amplification', 'extinction', 'birth', 'fusion', 'decomposition', 'existence', 'achievement', 'desire', 'satan'];
+const validReactionSourceTypes = ['basic', 'skill', 'technique', 'spell'];
+const validStatusKinds: StatusEffect['kind'][] = ['control', 'buff', 'debuff', 'special'];
 const validReactionTypes = ['dodge', 'guard', 'counter'];
 const validEquipmentSlots: EquipmentItem['slot'][] = ['weapon', 'armor', 'accessory'];
 const validEquipmentStatKeys = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'appearance'];
@@ -272,7 +279,8 @@ const isValidPendingReaction = (value: unknown): boolean => {
   return (
     (value.against === 'player' || value.against === 'enemy') &&
     typeof value.attackLog === 'string' &&
-    (value.damage === undefined || isNumber(value.damage))
+    (value.damage === undefined || isNumber(value.damage)) &&
+    (value.sourceType === undefined || validReactionSourceTypes.includes(value.sourceType as string))
   );
 };
 
@@ -302,6 +310,46 @@ const isValidPendingChoice = (value: unknown): value is PendingChoice => {
     (value.kind === 'magicTicketSelect' || value.kind === 'choiceItem') &&
     Array.isArray(value.options) &&
     value.options.every(isValidPendingChoiceOption)
+  );
+};
+
+
+const isValidStatusEffect = (value: unknown): value is StatusEffect => {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.name === 'string' &&
+    (value.target === 'player' || value.target === 'enemy') &&
+    isNumber(value.durationTurns) &&
+    validStatusKinds.includes(value.kind as StatusEffect['kind']) &&
+    (value.note === undefined || typeof value.note === 'string')
+  );
+};
+
+const isValidHaloState = (value: unknown): value is HaloState => {
+  if (!isObject(value) || !isObject(value.usedThisFloor)) {
+    return false;
+  }
+
+  return (
+    (value.selectedKind === undefined || validHaloKinds.includes(value.selectedKind as HaloKind)) &&
+    Object.entries(value.usedThisFloor).every(([key, recordValue]) => validHaloKinds.includes(key as HaloKind) && typeof recordValue === 'boolean') &&
+    (value.pendingAmplification === undefined ||
+      (isObject(value.pendingAmplification) &&
+        (value.pendingAmplification.actionId === undefined || typeof value.pendingAmplification.actionId === 'string') &&
+        (value.pendingAmplification.description === undefined || typeof value.pendingAmplification.description === 'string'))) &&
+    (value.pendingDesire === undefined ||
+      (isObject(value.pendingDesire) && typeof value.pendingDesire.result === 'string' && isNumber(value.pendingDesire.actionDisabledTurns))) &&
+    (value.satanActive === undefined || typeof value.satanActive === 'boolean') &&
+    (value.haloIgnoresOpponentHalo === undefined || typeof value.haloIgnoresOpponentHalo === 'boolean') &&
+    (value.haloIgnoresOpponentIbcheon === undefined || typeof value.haloIgnoresOpponentIbcheon === 'boolean') &&
+    Array.isArray(value.observedSpells) &&
+    value.observedSpells.every(isValidLearnedSpell) &&
+    Array.isArray(value.history) &&
+    value.history.every((entry) => typeof entry === 'string')
   );
 };
 
@@ -345,6 +393,9 @@ const isValidGameState = (value: unknown): value is GameState => {
     Array.isArray(value.techniques) &&
     value.techniques.every(isValidPlayerTechnique) &&
     isValidEquipmentLoadout(value.equipment) &&
+    Array.isArray(value.statuses) &&
+    value.statuses.every(isValidStatusEffect) &&
+    isValidHaloState(value.halo) &&
     isValidMagicBookAttempt(value.magicBookAttempt) &&
     isValidAngelTrial(value.angelTrial) &&
     (value.rewardState === undefined || isValidRewardState(value.rewardState)) &&
@@ -353,19 +404,28 @@ const isValidGameState = (value: unknown): value is GameState => {
   );
 };
 
-const refreshCharacterDerived = (character: Character, equipment?: EquipmentLoadout, skills: PlayerSkill[] = []): Character => {
-  const effectiveStats = character.kind === 'player' ? applyPassiveSkillStats(character.stats, skills) : character.stats;
+const refreshCharacterDerived = (character: Character, equipment?: EquipmentLoadout, effectiveStats?: CoreStats): Character => {
+  const derived = calcDerivedStats(effectiveStats ?? character.stats);
   const refreshed = {
     ...character,
-    derived: calcDerivedStats(effectiveStats)
+    derived,
+    hp: Math.min(character.hp, derived.maxHP),
+    mp: Math.min(character.mp, derived.maxMP)
   };
 
   return equipment ? applyEquipmentBonuses(refreshed, equipment) : refreshed;
 };
 
+const getEffectivePlayerStats = (state: GameState): CoreStats => {
+  const passiveStats = applyPassiveSkillStats(state.player.stats, state.skills);
+  return state.halo.selectedKind === 'satan' || state.halo.satanActive
+    ? { ...passiveStats, strength: passiveStats.strength + 10, dexterity: passiveStats.dexterity + 10, constitution: passiveStats.constitution + 10 }
+    : passiveStats;
+};
+
 const refreshDerivedStats = (state: GameState): GameState => ({
   ...state,
-  player: refreshCharacterDerived(state.player, state.equipment, state.skills),
+  player: refreshCharacterDerived(state.player, state.equipment, getEffectivePlayerStats(state)),
   enemy: refreshCharacterDerived(state.enemy)
 });
 
@@ -377,7 +437,7 @@ export const saveGameStub = (state: GameState): string => {
 
   localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
 
-  return `저장: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리, 보유 마법, 스킬, 기술 제작 출처, 기술, 장비, 마법서 시도권, 천사의 시련을 localStorage에 기록했습니다.`;
+  return `저장: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리, 보유 마법, 스킬, 기술 제작 출처, 기술, 장비, 헤일로, 상태효과, 마법서 시도권, 천사의 시련을 localStorage에 기록했습니다.`;
 };
 
 export const loadGameStub = (): GameState => {

@@ -15,6 +15,17 @@ import {
   setEnemyHpToOne
 } from '../game/debugTools';
 import { unequipItem } from '../game/equipment';
+import {
+  selectHaloKind,
+  useHaloAchievement,
+  useHaloAmplification,
+  useHaloBirth,
+  useHaloDecomposition,
+  useHaloDesire,
+  useHaloExistence,
+  useHaloExtinction,
+  useHaloFusion
+} from '../game/halo';
 import { getBattleUsableItems, sellInventoryItem, useInventoryItem } from '../game/inventory';
 import { applyFiveLevelPlus, canFinishLevelAllocation, finishLevelAllocation } from '../game/levelUp';
 import { resolvePlayerReaction, resolvePlayerReactionSkill } from '../game/reactionFlow';
@@ -25,6 +36,7 @@ import { getMinimapSummary } from '../map/minimap';
 import { getDirectionLabel } from '../game/movement';
 import { loadGameStub, saveGameStub } from '../storage/save';
 import { getAngelRewards, getUnclaimedAngelRewards } from '../rules/angelTrial';
+import { HALO_KINDS, canUseHalo, getHaloDescription, getHaloLabel, hasHaloAccess } from '../rules/halo';
 import { buyShopItem, canBuyShopItem, getShopItems } from '../rules/shop';
 import { describeSpell } from '../rules/spell';
 import { callLLM } from '../ai/router';
@@ -44,7 +56,7 @@ import {
   resetStats,
   type AllocatableStatKey
 } from '../game/statAllocation';
-import type { Character, Direction, EquipmentSlot, GameState, QueuedAction, TechniqueJudgeStat, TechniqueKind } from '../state/gameState';
+import type { Character, Direction, EquipmentSlot, GameState, HaloKind, QueuedAction, TechniqueJudgeStat, TechniqueKind } from '../state/gameState';
 
 type AppTab = 'battle' | 'sheet' | 'maintenance' | 'trial' | 'ai' | 'log';
 let activeTab: AppTab = 'battle';
@@ -122,7 +134,7 @@ const appendAILogs = (state: GameState, narration: string, combatLog: string[] =
 const toErrorMessage = (error: unknown): string => (error instanceof Error && error.message ? error.message : '알 수 없는 오류');
 
 const getInputValue = (root: HTMLElement, selector: string): string =>
-  root.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)?.value.trim() ?? '';
+  root.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(selector)?.value.trim() ?? '';
 
 const getChecked = (root: HTMLElement, selector: string): boolean =>
   root.querySelector<HTMLInputElement>(selector)?.checked ?? false;
@@ -801,6 +813,70 @@ const renderBattleItems = (state: GameState): string => {
   `;
 };
 
+
+const renderHaloPanel = (state: GameState, compact = false): string => {
+  const hasAccess = hasHaloAccess(state);
+  const selected = state.halo.selectedKind;
+
+  if (!hasAccess) {
+    return `<section class="panel halo-panel"><h2>헤일로</h2><p class="muted">헤일로를 보유하지 않았습니다.</p></section>`;
+  }
+
+  const selectedDescription = selected ? getHaloDescription(selected) : '정비 단계에서 사용할 천사의 헤일로를 선택하세요.';
+  const useDisabled = (kind: HaloKind): string => (canUseHalo(state, kind).ok ? '' : 'disabled');
+  const used = (kind: HaloKind): string => state.halo.usedThisFloor[kind] ? '사용 완료' : '사용 가능';
+
+  if (compact) {
+    return `
+      <section class="panel halo-panel compact">
+        <h2>헤일로</h2>
+        <p>현재 선택: <strong>${selected ? getHaloLabel(selected) : '없음'}</strong></p>
+        <p class="muted">${selectedDescription}</p>
+        ${selected && selected !== 'satan' ? `<button type="button" data-use-halo="${selected}" ${useDisabled(selected)}>현재 헤일로 사용</button>` : ''}
+        ${selected === 'satan' ? '<p class="muted">사탄은 선택형 패시브로 힘/민첩/체력 +10을 적용합니다.</p>' : ''}
+      </section>
+    `;
+  }
+
+  return `
+    <section class="panel halo-panel">
+      <h2>헤일로</h2>
+      <p>보유 상태: <strong>보유</strong></p>
+      <p>현재 선택: <strong>${selected ? getHaloLabel(selected) : '없음'}</strong></p>
+      <p class="muted">${selectedDescription}</p>
+      <div class="choice-grid halo-kind-grid">
+        ${HALO_KINDS.map(
+          (kind) => `<button type="button" class="choice ${selected === kind ? 'selected' : ''}" data-select-halo-kind="${kind}">${getHaloLabel(kind)}</button>`
+        ).join('')}
+      </div>
+      <div class="halo-list">
+        ${HALO_KINDS.map((kind) => `<div><strong>${getHaloLabel(kind)}</strong><span>${getHaloDescription(kind)}</span><em>${['amplification', 'extinction', 'birth'].includes(kind) ? used(kind) : kind === 'satan' ? '패시브' : '제한 없음'}</em></div>`).join('')}
+      </div>
+      <details open>
+        <summary>헤일로 사용</summary>
+        <div class="halo-input-grid">
+          <label>증폭 설명<input data-halo-amplification-description value="다음 행동" /></label>
+          <button type="button" data-use-halo="amplification" ${useDisabled('amplification')}>증폭 사용</button>
+          <label>소멸 대상<input data-halo-extinction-target placeholder="생명체가 아닌 대상" /></label>
+          <button type="button" data-use-halo="extinction" ${useDisabled('extinction')}>소멸 사용</button>
+          <label>탄생 물건<input data-halo-birth-item placeholder="창조할 물건" /></label>
+          <button type="button" data-use-halo="birth" ${useDisabled('birth')}>탄생 사용</button>
+          <label>결합 A<select data-halo-fusion-a>${state.techniques.map((technique) => `<option value="${technique.id}">${technique.name}</option>`).join('')}</select></label>
+          <label>결합 B<select data-halo-fusion-b>${state.techniques.map((technique) => `<option value="${technique.id}">${technique.name}</option>`).join('')}</select></label>
+          <button type="button" data-use-halo-fusion ${useDisabled('fusion')}>결합 사용</button>
+          <button type="button" data-use-halo-decomposition ${useDisabled('decomposition')}>분해 사용</button>
+          <label>존재 개념<input data-halo-existence-concept placeholder="공간, 빛 등" /></label>
+          <button type="button" data-use-halo="existence" ${useDisabled('existence')}>존재 사용</button>
+          <button type="button" data-use-halo="achievement" ${useDisabled('achievement')}>성취 사용</button>
+          <label>욕망 결과<input data-halo-desire-result placeholder="끌어올 결과" /></label>
+          <label>행동 불능 턴<input type="number" min="0" data-halo-desire-disabled-turns value="0" /></label>
+          <button type="button" data-use-halo="desire" ${useDisabled('desire')}>욕망 사용</button>
+        </div>
+      </details>
+    </section>
+  `;
+};
+
 const renderReactionPanel = (state: GameState): string => {
   if (state.phase !== 'player-reaction') {
     return '';
@@ -926,6 +1002,7 @@ const renderBattleTab = (state: GameState): string => `
       <section class="panel minimap"><h2>미니맵 요약</h2><p>${getMinimapSummary(state)}</p></section>
       ${renderActionQueue(state)}
       ${renderActionButtons(state)}
+      ${renderHaloPanel(state, true)}
     </div>
     <div>
       ${renderKnownTechniquesForBattle(state)}
@@ -957,6 +1034,7 @@ const renderSheetTab = (state: GameState): string => `
     ${renderCharacterCard(state.player)}
     ${renderStatAllocationPanel(state)}
     ${renderLevelUpAllocationPanel(state)}
+    ${renderHaloPanel(state)}
     ${renderTechniqueManagement(state)}
     ${renderPassiveSummary(state)}
     ${renderSkillManagement(state)}
@@ -969,6 +1047,7 @@ const renderMaintenanceTab = (state: GameState): string => `
   <section class="tab-panel" data-tab-panel="maintenance">
     <section class="panel"><h2>마법서 시도권</h2><p>이번 층 마법서 무료 시도: <strong>${state.magicBookAttempt.floor === state.floor && state.magicBookAttempt.freeUsed ? '사용 완료, 이후 1회 1코인' : '사용 가능'}</strong></p></section>
     ${renderFloorClearPanel(state)}
+    ${renderHaloPanel(state)}
     ${renderRewardPanel(state)}
     ${renderShopPanel(state)}
     ${renderEquipmentPanel(state)}
@@ -1024,6 +1103,7 @@ const renderAITab = (): string => `<section class="tab-panel" data-tab-panel="ai
 const renderLogTab = (state: GameState): string => `
   <section class="tab-panel" data-tab-panel="log">
     ${renderLog(state)}
+    <section class="panel halo-panel"><h2>헤일로 기록</h2>${state.halo.history.length === 0 ? '<p class="muted">헤일로 기록이 없습니다.</p>' : `<ol>${state.halo.history.slice(-20).map((entry) => `<li>${entry}</li>`).join('')}</ol>`}</section>
     ${renderDebugPanel()}
   </section>
 `;
@@ -1105,6 +1185,8 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const confirmChoiceId = target.dataset.confirmChoice;
     const reaction = target.dataset.reaction as 'dodge' | 'guard' | 'counter' | 'none' | undefined;
     const reactionSkillId = target.dataset.reactionSkill;
+    const selectHalo = target.dataset.selectHaloKind as HaloKind | undefined;
+    const useHalo = target.dataset.useHalo as HaloKind | undefined;
     const debugAction = target.dataset.debugAction;
     const tab = target.dataset.tab as AppTab | undefined;
     const angelManualScore = Number(getInputValue(root, '[data-angel-manual-score]'));
@@ -1120,6 +1202,45 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     if (tab) {
       activeTab = tab;
       render(root, getState());
+      return;
+    }
+
+
+    if (selectHalo) {
+      await setStateWithAuto(selectHaloKind(getState(), selectHalo), '헤일로 선택 후');
+      return;
+    }
+
+    if (useHalo) {
+      const haloState = getState();
+      const nextState =
+        useHalo === 'amplification'
+          ? useHaloAmplification(haloState, getInputValue(root, '[data-halo-amplification-description]'))
+          : useHalo === 'extinction'
+            ? useHaloExtinction(haloState, getInputValue(root, '[data-halo-extinction-target]'))
+            : useHalo === 'birth'
+              ? useHaloBirth(haloState, getInputValue(root, '[data-halo-birth-item]'))
+              : useHalo === 'existence'
+                ? useHaloExistence(haloState, getInputValue(root, '[data-halo-existence-concept]'))
+                : useHalo === 'achievement'
+                  ? useHaloAchievement(haloState)
+                  : useHalo === 'desire'
+                    ? useHaloDesire(haloState, getInputValue(root, '[data-halo-desire-result]'), Number(getInputValue(root, '[data-halo-desire-disabled-turns]') || 0))
+                    : appendLog(haloState, '사탄 헤일로는 사용 버튼이 아니라 선택형 패시브입니다.');
+      await setStateWithAuto(nextState, '헤일로 사용 후');
+      return;
+    }
+
+    if (target.dataset.useHaloFusion !== undefined) {
+      await setStateWithAuto(
+        useHaloFusion(getState(), getInputValue(root, '[data-halo-fusion-a]'), getInputValue(root, '[data-halo-fusion-b]')),
+        '헤일로 사용 후'
+      );
+      return;
+    }
+
+    if (target.dataset.useHaloDecomposition !== undefined) {
+      await setStateWithAuto(useHaloDecomposition(getState()), '헤일로 사용 후');
       return;
     }
 

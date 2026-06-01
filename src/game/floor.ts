@@ -1,3 +1,4 @@
+import { resetHaloFloorUses } from '../rules/halo';
 import { appendLog, createInitialEnemy, type GameState } from '../state/gameState';
 
 const getInitiative = (state: GameState): GameState['initiative'] =>
@@ -34,8 +35,9 @@ export const enterNextFloor = (state: GameState): GameState => {
   }
 
   const enemy = createInitialEnemy();
+  const haloResetState = resetHaloFloorUses(state);
   const positionedState = {
-    ...state,
+    ...haloResetState,
     floor: state.floor + 1,
     player: {
       ...state.player,

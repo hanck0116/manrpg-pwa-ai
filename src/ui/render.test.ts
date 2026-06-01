@@ -180,3 +180,39 @@ describe('automatic AI narration', () => {
     expect(applied[1].log.map((entry) => entry.message)).toContain('AI 로그');
   });
 });
+
+describe('halo UI', () => {
+  it('shows no-access message and nine halo selectors when halo is owned', async () => {
+    class TestButton {
+      dataset: Record<string, string>;
+      constructor(dataset: Record<string, string>) {
+        this.dataset = dataset;
+      }
+    }
+    vi.stubGlobal('HTMLButtonElement', TestButton);
+    const { root, getClickHandler } = makeRoot();
+    let state: GameState = createInitialGameState();
+    const setState = (next: GameState): void => {
+      state = next;
+      render(root, state);
+    };
+
+    render(root, state);
+    expect(root.innerHTML).toContain('헤일로를 보유하지 않았습니다.');
+
+    state = {
+      ...state,
+      setupMode: false,
+      phase: 'floor-cleared',
+      player: { ...state.player, stats: { ...state.player.stats, traits: ['헤일로'] } }
+    };
+    render(root, state);
+    bindUI(root, () => state, setState);
+    await getClickHandler()({ target: new TestButton({ tab: 'maintenance' }) });
+
+    expect(root.innerHTML).toContain('data-select-halo-kind="amplification"');
+    expect(root.innerHTML).toContain('data-select-halo-kind="satan"');
+    expect(root.innerHTML).toContain('data-use-halo="birth"');
+    vi.unstubAllGlobals();
+  });
+});

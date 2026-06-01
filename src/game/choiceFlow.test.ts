@@ -153,12 +153,12 @@ describe('choice flow', () => {
     expect(next.player.stats.traits).not.toContain('정령왕');
   });
 
-  it('round-trips saveVersion 16 state with pendingChoice', () => {
+  it('round-trips saveVersion 17 state with pendingChoice', () => {
     vi.stubGlobal('localStorage', createLocalStorage());
     const item = makeItem('기초 마법서 선택권');
     const pending = useInventoryItem({ ...maintenanceState(), inventory: [item] }, item.id);
 
-    expect(saveGameStub(pending)).toContain('saveVersion 16');
+    expect(saveGameStub(pending)).toContain('saveVersion 17');
     expect(loadGameStub().pendingChoice).toMatchObject({
       kind: 'magicTicketSelect',
       sourceItemName: '기초 마법서 선택권'

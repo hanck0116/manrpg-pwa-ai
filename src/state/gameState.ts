@@ -64,6 +64,16 @@ export type PendingReaction = {
   against: 'player' | 'enemy';
   attackLog: string;
   damage?: number;
+  sourceType?: 'basic' | 'skill' | 'technique' | 'spell';
+};
+
+export type StatusEffect = {
+  id: string;
+  name: string;
+  target: 'player' | 'enemy';
+  durationTurns: number;
+  kind: 'control' | 'buff' | 'debuff' | 'special';
+  note?: string;
 };
 
 export type GameLogEntry = {
@@ -105,6 +115,35 @@ export type LearnedSpell = {
   circle: number;
   grade: string;
   sourceItemName?: string;
+};
+
+export type HaloKind =
+  | 'amplification'
+  | 'extinction'
+  | 'birth'
+  | 'fusion'
+  | 'decomposition'
+  | 'existence'
+  | 'achievement'
+  | 'desire'
+  | 'satan';
+
+export type HaloState = {
+  selectedKind?: HaloKind;
+  usedThisFloor: Partial<Record<HaloKind, boolean>>;
+  pendingAmplification?: {
+    actionId?: string;
+    description?: string;
+  };
+  pendingDesire?: {
+    result: string;
+    actionDisabledTurns: number;
+  };
+  satanActive?: boolean;
+  haloIgnoresOpponentHalo?: boolean;
+  haloIgnoresOpponentIbcheon?: boolean;
+  observedSpells: LearnedSpell[];
+  history: string[];
 };
 
 export type SkillResourceType = 'outer' | 'inner' | 'sword' | 'magic' | 'none';
@@ -221,6 +260,8 @@ export type GameState = {
   battleResult?: BattleResult;
   pendingReaction?: PendingReaction;
   pendingChoice?: PendingChoice;
+  statuses: StatusEffect[];
+  halo: HaloState;
   magicBookAttempt: {
     floor: number;
     freeUsed: boolean;
@@ -318,6 +359,12 @@ export const createInitialGameState = (): GameState => {
     techniqueSources: [],
     techniques: [],
     equipment: {},
+    statuses: [],
+    halo: {
+      usedThisFloor: {},
+      observedSpells: [],
+      history: []
+    },
     magicBookAttempt: {
       floor: 1,
       freeUsed: false

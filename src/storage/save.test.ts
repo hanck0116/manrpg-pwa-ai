@@ -17,11 +17,11 @@ const createLocalStorage = () => {
   };
 };
 
-describe('saveVersion 16', () => {
-  it('stores saveVersion 16', () => {
+describe('saveVersion 17', () => {
+  it('stores saveVersion 17', () => {
     vi.stubGlobal('localStorage', createLocalStorage());
 
-    expect(saveGameStub(createInitialGameState())).toContain('saveVersion 16');
+    expect(saveGameStub(createInitialGameState())).toContain('saveVersion 17');
 
     vi.unstubAllGlobals();
   });
@@ -116,6 +116,31 @@ describe('saveVersion 16', () => {
     expect(loaded.techniqueSources).toEqual(['공법']);
     expect(loaded.techniques[0].name).toBe('격');
     expect(loaded.skills[0].damageMultiplier).toBe(2);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps halo and status state after save/load', () => {
+    vi.stubGlobal('localStorage', createLocalStorage());
+    const state = {
+      ...createInitialGameState(),
+      statuses: [{ id: 'status-1', name: '욕망의 대가', target: 'player' as const, durationTurns: 2, kind: 'control' as const, note: '결과' }],
+      halo: {
+        selectedKind: 'desire' as const,
+        usedThisFloor: { amplification: true },
+        pendingAmplification: { description: '다음 행동' },
+        pendingDesire: { result: '결과', actionDisabledTurns: 2 },
+        observedSpells: [{ id: 'spell-1', name: '관측', circle: 1, grade: '기초' }],
+        history: ['헤일로 기록']
+      }
+    };
+
+    saveGameStub(state);
+    const loaded = loadGameStub();
+
+    expect(loaded.halo.selectedKind).toBe('desire');
+    expect(loaded.halo.observedSpells[0].name).toBe('관측');
+    expect(loaded.statuses[0].name).toBe('욕망의 대가');
 
     vi.unstubAllGlobals();
   });
