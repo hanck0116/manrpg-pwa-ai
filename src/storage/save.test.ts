@@ -17,11 +17,11 @@ const createLocalStorage = () => {
   };
 };
 
-describe('saveVersion 14', () => {
-  it('stores saveVersion 14', () => {
+describe('saveVersion 15', () => {
+  it('stores saveVersion 15', () => {
     vi.stubGlobal('localStorage', createLocalStorage());
 
-    expect(saveGameStub(createInitialGameState())).toContain('saveVersion 14');
+    expect(saveGameStub(createInitialGameState())).toContain('saveVersion 15');
 
     vi.unstubAllGlobals();
   });
@@ -69,6 +69,53 @@ describe('saveVersion 14', () => {
     expect(loaded.magicBookAttempt).toEqual({ floor: 3, freeUsed: true });
     expect(loaded.inventory[0].type).toBe('magicTicket');
     expect(loaded.skills[0].name).toBe('테스트 스킬');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps techniqueSources, techniques, and extended skill fields', () => {
+    vi.stubGlobal('localStorage', createLocalStorage());
+    const state = {
+      ...createInitialGameState(),
+      techniqueSources: ['공법'],
+      techniques: [
+        {
+          id: 'tech-1',
+          name: '격',
+          source: '공법',
+          kind: 'attack' as const,
+          mpDelta: -1,
+          hpDelta: 0,
+          damageMultiplier: 1.5,
+          judgeStat: 'strength' as const,
+          judgeBonus: 1
+        }
+      ],
+      skills: [
+        {
+          id: 'skill-2',
+          name: '확장',
+          resourceType: 'outer' as const,
+          timing: 'main' as const,
+          multiplier: 1,
+          target: 'enemy' as const,
+          effectType: 'damage' as const,
+          mpDelta: -1,
+          hpDelta: 0,
+          damageMultiplier: 2,
+          judgeStat: 'strength' as const,
+          judgeBonus: 1,
+          kind: 'attack' as const
+        }
+      ]
+    };
+
+    saveGameStub(state);
+    const loaded = loadGameStub();
+
+    expect(loaded.techniqueSources).toEqual(['공법']);
+    expect(loaded.techniques[0].name).toBe('격');
+    expect(loaded.skills[0].damageMultiplier).toBe(2);
 
     vi.unstubAllGlobals();
   });

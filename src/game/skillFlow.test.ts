@@ -53,7 +53,7 @@ describe('skill flow', () => {
     expect(next.inventory).toHaveLength(0);
   });
 
-  it('saveVersion 14 validates skills', () => {
+  it('saveVersion 15 validates skills', () => {
     const storage = new Map<string, string>();
     vi.stubGlobal('localStorage', {
       getItem: vi.fn((key: string) => storage.get(key) ?? null),
@@ -65,7 +65,7 @@ describe('skill flow', () => {
       })
     });
 
-    expect(saveGameStub(maintenanceState())).toContain('saveVersion 14');
+    expect(saveGameStub(maintenanceState())).toContain('saveVersion 15');
     expect(loadGameStub().skills).toHaveLength(1);
 
     vi.unstubAllGlobals();

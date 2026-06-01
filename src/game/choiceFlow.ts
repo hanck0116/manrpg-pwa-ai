@@ -67,10 +67,7 @@ export const confirmPendingChoice = (state: GameState, optionId: string): GameSt
   }
 
   return applyChoiceItemResult(
-    {
-      ...state,
-      pendingChoice: undefined
-    },
+    state,
     state.pendingChoice.sourceItemId,
     state.pendingChoice.sourceItemName,
     option.value

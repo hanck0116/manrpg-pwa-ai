@@ -72,7 +72,9 @@ export const calcDerivedStats = (stats: CoreStats): DerivedStats => {
   const baseAtk = Math.floor((strength + constitution) / 10) + 2;
   const outerMultiplier = Math.pow(1.4, outerStack);
   const innerMultiplier = Math.pow(1.2, innerStack);
-  // TODO: 심법/심적초월/불멸/자기상환적 돌연변이는 현재 상태 필드가 정리되면 원본 calc 순서대로 반영합니다.
+  const simbeopMpMultiplier = traits.includes('심법') ? 2 : 1;
+  const mentalTranscendenceMpMultiplier = traits.includes('심적초월') ? 2 : 1;
+  // TODO: 임모탈 평선 발동/해제, 자기상환적 돌연변이 배수 선택 등 사용형/상태형 효과는 별도 상태 필드와 UI가 정리되면 반영합니다.
   const attack = Math.max(0, Math.floor(baseAtk * swordKi.atkMul * calcAttackTraitMultiplier(traits)));
 
   return {
@@ -81,8 +83,8 @@ export const calcDerivedStats = (stats: CoreStats): DerivedStats => {
     usedStatPoint,
     remainingStatPoint: totalStatPoint - usedStatPoint,
     maxHP: Math.max(1, Math.floor(baseHP * outerMultiplier)),
-    maxMP: Math.max(0, Math.floor(baseMP * innerMultiplier + swordKi.mpDelta)),
-    mpRegen: Math.max(0, Math.floor(baseRegen * innerMultiplier)),
+    maxMP: Math.max(0, Math.floor((baseMP * innerMultiplier + swordKi.mpDelta) * simbeopMpMultiplier * mentalTranscendenceMpMultiplier)),
+    mpRegen: Math.max(0, Math.floor(baseRegen * innerMultiplier * simbeopMpMultiplier)),
     basicAtk: baseAtk,
     attack,
     outerMultiplier,

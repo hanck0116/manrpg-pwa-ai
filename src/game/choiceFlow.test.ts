@@ -104,6 +104,7 @@ describe('choice flow', () => {
 
     expect(next.player.stats.traits).toContain('모델링');
     expect(next.inventory).toHaveLength(0);
+    expect(next.pendingChoice).toBeUndefined();
   });
 
   it('does not duplicate already owned traits', () => {
@@ -117,6 +118,9 @@ describe('choice flow', () => {
     const next = confirmPendingChoice(pending, pending.pendingChoice?.options[0]?.id ?? '');
 
     expect(next.player.stats.traits).toEqual(['모델링']);
+    expect(next.inventory).toHaveLength(1);
+    expect(next.pendingChoice).toEqual(pending.pendingChoice);
+    expect(next.log.at(-1)?.message).toBe('이미 보유한 특성입니다. 다른 선택지를 고르세요.');
   });
 
   it('blocks 중급 정령 without 하급 정령', () => {
@@ -125,6 +129,7 @@ describe('choice flow', () => {
     const next = confirmPendingChoice(pending, pending.pendingChoice?.options[0]?.id ?? '');
 
     expect(next.inventory).toHaveLength(1);
+    expect(next.pendingChoice).toEqual(pending.pendingChoice);
     expect(next.player.stats.traits).not.toContain('중급 정령');
   });
 
@@ -134,6 +139,7 @@ describe('choice flow', () => {
     const next = confirmPendingChoice(pending, pending.pendingChoice?.options[0]?.id ?? '');
 
     expect(next.inventory).toHaveLength(1);
+    expect(next.pendingChoice).toEqual(pending.pendingChoice);
     expect(next.player.stats.traits).not.toContain('상급 정령');
   });
 
@@ -143,15 +149,16 @@ describe('choice flow', () => {
     const next = confirmPendingChoice(pending, pending.pendingChoice?.options[0]?.id ?? '');
 
     expect(next.inventory).toHaveLength(1);
+    expect(next.pendingChoice).toEqual(pending.pendingChoice);
     expect(next.player.stats.traits).not.toContain('정령왕');
   });
 
-  it('round-trips saveVersion 14 state with pendingChoice', () => {
+  it('round-trips saveVersion 15 state with pendingChoice', () => {
     vi.stubGlobal('localStorage', createLocalStorage());
     const item = makeItem('기초 마법서 선택권');
     const pending = useInventoryItem({ ...maintenanceState(), inventory: [item] }, item.id);
 
-    expect(saveGameStub(pending)).toContain('saveVersion 14');
+    expect(saveGameStub(pending)).toContain('saveVersion 15');
     expect(loadGameStub().pendingChoice).toMatchObject({
       kind: 'magicTicketSelect',
       sourceItemName: '기초 마법서 선택권'

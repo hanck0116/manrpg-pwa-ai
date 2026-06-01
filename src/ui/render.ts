@@ -31,6 +31,7 @@ import { callLLM } from '../ai/router';
 import { setAISettings, clearAIKeys, getAISettings, type AIProvider, type AISettings } from '../ai/settings';
 import { clearAIUsage } from '../ai/usage';
 import { addPlayerSkill } from '../game/skillBook';
+import { addPlayerTechnique } from '../game/techniqueBook';
 import { getEquipmentLabel } from '../rules/equipment';
 import {
   allocatableStatKeys,
@@ -42,7 +43,7 @@ import {
   resetStats,
   type AllocatableStatKey
 } from '../game/statAllocation';
-import type { Character, Direction, EquipmentSlot, GameState, QueuedAction } from '../state/gameState';
+import type { Character, Direction, EquipmentSlot, GameState, QueuedAction, TechniqueJudgeStat, TechniqueKind } from '../state/gameState';
 
 type AppTab = 'battle' | 'sheet' | 'maintenance' | 'trial' | 'ai' | 'log';
 let activeTab: AppTab = 'battle';
@@ -54,6 +55,7 @@ const actionLabels: Record<QueuedAction['type'], string> = {
   'basic-attack': '기본 공격',
   skill: '스킬',
   spell: '마법',
+  technique: '기술',
   item: '아이템',
   defend: '방어',
   wait: '대기'
@@ -95,6 +97,13 @@ const createQueuedAction = (type: QueuedAction['type'], direction?: Direction, s
   label: type === 'move' ? `${getDirectionLabel(direction ?? 'up')}으로 ${steps ?? 1}칸 이동` : actionLabels[type],
   direction,
   steps
+});
+
+const createTechniqueAction = (techniqueId: string, techniqueName: string): QueuedAction => ({
+  id: createActionId(),
+  type: 'technique',
+  techniqueId,
+  label: `${techniqueName} 사용`
 });
 
 const createSkillAction = (skillId: string, skillName: string): QueuedAction => ({
@@ -643,8 +652,113 @@ const renderSkillManagement = (state: GameState): string => {
           </select>
         </label>
         <label>배율 <input type="number" min="0.1" step="0.1" data-skill-multiplier value="1" /></label>
+        <label>스킬 유형 <select data-skill-kind>${kindOptions(true)}</select></label>
+        <label>MP 변화량 <input type="number" step="1" data-skill-mp-delta value="0" /></label>
+        <label>HP 변화량 <input type="number" step="1" data-skill-hp-delta value="0" /></label>
+        <label>공격 피해 배수 <input type="number" min="0" step="0.1" data-skill-damage-multiplier value="0" /></label>
+        <label>판정 스탯 <select data-skill-judge-stat>${judgeStatOptions()}</select></label>
+        <label>판정 보정 <input type="number" step="1" data-skill-judge-bonus value="0" /></label>
+        <label>패시브 스탯 <select data-skill-passive-stat>${judgeStatOptions('strength').replace('<option value=\"none\" >없음</option>', '')}</select></label>
+        <label>패시브 값 <input type="number" step="1" data-skill-passive-value value="0" /></label>
         <label>설명 <textarea rows="2" data-skill-description placeholder="원본 확인용 설명"></textarea></label>
         <button type="button" data-create-skill ${canCreate ? '' : 'disabled'}>스킬 생성</button>
+      </details>
+    </section>
+  `;
+};
+
+
+const judgeStatOptions = (selected: string = 'none'): string =>
+  [
+    ['none', '없음'],
+    ['strength', '힘'],
+    ['dexterity', '민첩'],
+    ['constitution', '체력'],
+    ['intelligence', '지능'],
+    ['wisdom', '지혜'],
+    ['appearance', '외모']
+  ]
+    .map(([value, label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`)
+    .join('');
+
+const kindOptions = (includePassive = false): string =>
+  [
+    ['attack', '공격'],
+    ['defense', '방어'],
+    ['heal', '회복'],
+    ['buff', '버프'],
+    ['debuff', '디버프'],
+    ['move', '이동'],
+    ['special', '특수'],
+    ...(includePassive ? [['passive', '패시브']] : [])
+  ]
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join('');
+
+const renderKnownTechniquesForBattle = (state: GameState): string => {
+  const canQueueTechnique = state.phase === 'player-main' && !state.setupMode && !state.levelUpPending;
+
+  return `
+    <section class="panel techniques-panel">
+      <details>
+        <summary>보유 기술 (${state.techniques.length})</summary>
+        ${
+          state.techniques.length === 0
+            ? '<p class="muted">보유 기술이 없습니다.</p>'
+            : `<ul class="inventory-list">${state.techniques
+                .map(
+                  (technique) => `
+                    <li>
+                      <span>${technique.name} / ${technique.source} / ${technique.kind} / MP ${technique.mpDelta} / HP ${technique.hpDelta} / 피해 ${technique.damageMultiplier}배</span>
+                      <button type="button" data-add-technique="${technique.id}" ${canQueueTechnique ? '' : 'disabled'}>큐에 추가</button>
+                    </li>
+                  `
+                )
+                .join('')}</ul>`
+        }
+      </details>
+    </section>
+  `;
+};
+
+const renderTechniqueManagement = (state: GameState): string => {
+  const canCreate = ['floor-cleared', 'reward-pending', 'level-up-pending', 'battle-ended'].includes(state.phase);
+  const unusedSources = state.techniqueSources.filter((source) => !state.techniques.some((technique) => technique.source === source));
+
+  return `
+    <section class="panel techniques-panel">
+      <details open>
+        <summary>기술 제작 출처 (${state.techniqueSources.length})</summary>
+        ${state.techniqueSources.length === 0 ? '<p class="muted">해금된 기술 제작 출처가 없습니다. 공법/무공/오리지널 스킬/유물 등 출처 아이템을 사용하거나 선택권에서 고르세요.</p>' : `<p>${state.techniqueSources.join(', ')}</p>`}
+      </details>
+      <details>
+        <summary>보유 기술 (${state.techniques.length})</summary>
+        ${
+          state.techniques.length === 0
+            ? '<p class="muted">보유 기술이 없습니다.</p>'
+            : `<ul class="inventory-list">${state.techniques
+                .map((technique) => `<li><span>${technique.name} / ${technique.source} / ${technique.kind} / MP ${technique.mpDelta} / HP ${technique.hpDelta} / 피해 ${technique.damageMultiplier}배</span></li>`)
+                .join('')}</ul>`
+        }
+      </details>
+      <details open>
+        <summary>기술 제작</summary>
+        <p class="muted">해금된 출처 1개당 기술 1개만 제작합니다. 상태이상/소환/광역 효과는 실제 효과가 아니라 설명에만 남깁니다.</p>
+        ${unusedSources.length === 0 ? '<p class="muted">사용 가능한 기술 제작 출처가 없어 제작할 수 없습니다.</p>' : ''}
+        <label>출처
+          <select data-technique-source>
+            ${unusedSources.map((source) => `<option value="${source}">${source}</option>`).join('')}
+          </select>
+        </label>
+        <label>기술 이름 <input type="text" data-technique-name placeholder="기술 이름" /></label>
+        <label>유형 <select data-technique-kind>${kindOptions(false)}</select></label>
+        <label>MP 변화량 <input type="number" step="1" data-technique-mp-delta value="0" /></label>
+        <label>HP 변화량 <input type="number" step="1" data-technique-hp-delta value="0" /></label>
+        <label>공격 피해 배수 <input type="number" min="0" step="0.1" data-technique-damage-multiplier value="0" /></label>
+        <label>판정 스탯 <select data-technique-judge-stat>${judgeStatOptions()}</select></label>
+        <label>판정 보정 <input type="number" step="1" data-technique-judge-bonus value="0" /></label>
+        <label>설명 <textarea rows="2" data-technique-description placeholder="상태이상/소환/광역 등 보류 효과는 설명에만 기록"></textarea></label>
+        <button type="button" data-create-technique ${canCreate && unusedSources.length > 0 ? '' : 'disabled'}>기술 제작</button>
       </details>
     </section>
   `;
@@ -798,6 +912,7 @@ const renderBattleTab = (state: GameState): string => `
       ${renderActionButtons(state)}
     </div>
     <div>
+      ${renderKnownTechniquesForBattle(state)}
       ${renderKnownSkillsForBattle(state)}
       ${renderKnownSpells(state)}
       ${renderBattleItems(state)}
@@ -812,6 +927,7 @@ const renderSheetTab = (state: GameState): string => `
     ${renderCharacterCard(state.player)}
     ${renderStatAllocationPanel(state)}
     ${renderLevelUpAllocationPanel(state)}
+    ${renderTechniqueManagement(state)}
     ${renderSkillManagement(state)}
     ${renderKnownSpells(state)}
     ${renderEquipmentPanel(state)}
@@ -952,6 +1068,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const unequipSlot = target.dataset.unequipSlot as EquipmentSlot | undefined;
     const addSpellId = target.dataset.addSpell;
     const addSkillId = target.dataset.addSkill;
+    const addTechniqueId = target.dataset.addTechnique;
     const addBattleItemId = target.dataset.addBattleItem;
     const buyShopItemId = target.dataset.buyShopItem;
     const confirmChoiceId = target.dataset.confirmChoice;
@@ -1279,9 +1396,33 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
       return;
     }
 
+    if (addTechniqueId) {
+      const technique = getState().techniques.find((knownTechnique) => knownTechnique.id === addTechniqueId);
+      setState(enqueueAction(getState(), createTechniqueAction(addTechniqueId, technique?.name ?? '기술')));
+      return;
+    }
+
     if (addSkillId) {
       const skill = getState().skills.find((knownSkill) => knownSkill.id === addSkillId);
       setState(enqueueAction(getState(), createSkillAction(addSkillId, skill?.name ?? '스킬')));
+      return;
+    }
+
+    if (target.dataset.createTechnique !== undefined) {
+      await setStateWithAuto(
+        addPlayerTechnique(getState(), {
+          name: getInputValue(root, '[data-technique-name]'),
+          source: getInputValue(root, '[data-technique-source]'),
+          kind: getInputValue(root, '[data-technique-kind]') as TechniqueKind,
+          mpDelta: Number(getInputValue(root, '[data-technique-mp-delta]') || 0),
+          hpDelta: Number(getInputValue(root, '[data-technique-hp-delta]') || 0),
+          damageMultiplier: Number(getInputValue(root, '[data-technique-damage-multiplier]') || 0),
+          judgeStat: getInputValue(root, '[data-technique-judge-stat]') as TechniqueJudgeStat,
+          judgeBonus: Number(getInputValue(root, '[data-technique-judge-bonus]') || 0),
+          description: getInputValue(root, '[data-technique-description]')
+        }),
+        '기술 제작 후'
+      );
       return;
     }
 
@@ -1293,11 +1434,19 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
           name: getInputValue(root, '[data-skill-name]'),
           description: getInputValue(root, '[data-skill-description]'),
           resourceType: getInputValue(root, '[data-skill-resource]') as 'outer' | 'inner' | 'sword' | 'magic' | 'none',
-          timing: 'main',
           effectType,
           target: targetType,
           multiplier: Number(getInputValue(root, '[data-skill-multiplier]') || 1),
-          source: 'user'
+          source: 'user',
+          kind: getInputValue(root, '[data-skill-kind]') as TechniqueKind | 'passive',
+          timing: getInputValue(root, '[data-skill-kind]') === 'passive' ? 'passive' : 'main',
+          mpDelta: Number(getInputValue(root, '[data-skill-mp-delta]') || 0),
+          hpDelta: Number(getInputValue(root, '[data-skill-hp-delta]') || 0),
+          damageMultiplier: Number(getInputValue(root, '[data-skill-damage-multiplier]') || 0),
+          judgeStat: getInputValue(root, '[data-skill-judge-stat]') as TechniqueJudgeStat,
+          judgeBonus: Number(getInputValue(root, '[data-skill-judge-bonus]') || 0),
+          passiveStat: getInputValue(root, '[data-skill-passive-stat]') as Exclude<TechniqueJudgeStat, 'none'>,
+          passiveValue: Number(getInputValue(root, '[data-skill-passive-value]') || 0)
         }),
         '스킬 생성 후'
       );

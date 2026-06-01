@@ -3,6 +3,7 @@ import { moveCharacterSteps } from './movement';
 import { resolveBasicAttack } from '../rules/combat';
 import { resolveSkillUse } from '../rules/skillCombat';
 import { resolveSpellCast } from '../rules/spellCombat';
+import { resolveTechniqueUse } from '../rules/techniqueCombat';
 import { appendLog, type GameState, type QueuedAction } from '../state/gameState';
 
 const terminalPhases: GameState['phase'][] = ['battle-ended', 'floor-cleared', 'reward-pending', 'level-up-pending'];
@@ -61,6 +62,13 @@ export const enqueueAction = (state: GameState, action: QueuedAction): GameState
     return appendLog(state, '플레이어가 쓰러진 상태라 행동을 추가할 수 없습니다.');
   }
 
+  if (action.type === 'skill' && action.skillId) {
+    const skill = state.skills.find((playerSkill) => playerSkill.id === action.skillId);
+    if (skill?.kind === 'passive' || skill?.timing === 'passive') {
+      return appendLog(state, '패시브 스킬은 전투 큐에 추가할 수 없습니다.');
+    }
+  }
+
   if (action.type === 'basic-attack' && state.enemy.hp <= 0) {
     return appendLog(state, '적이 이미 쓰러져 기본 공격 행동을 추가할 수 없습니다.');
   }
@@ -103,6 +111,30 @@ const executeSpellAction = (state: GameState, action: QueuedAction): GameState =
       ...state,
       player: result.caster.kind === 'player' ? result.caster : state.player,
       enemy: result.target.kind === 'enemy' ? result.target : state.enemy
+    },
+    result.log
+  );
+};
+
+
+const executeTechniqueAction = (state: GameState, action: QueuedAction): GameState => {
+  if (!action.techniqueId) {
+    return appendLog(state, '기술 사용 실패: 사용할 기술을 선택해야 합니다.');
+  }
+
+  const technique = state.techniques.find((playerTechnique) => playerTechnique.id === action.techniqueId);
+
+  if (!technique) {
+    return appendLog(state, '기술 사용 실패: 보유하지 않은 기술입니다.');
+  }
+
+  const result = resolveTechniqueUse(state.player, state.enemy, technique);
+
+  return appendLog(
+    {
+      ...state,
+      player: result.player,
+      enemy: result.enemy
     },
     result.log
   );
@@ -181,6 +213,8 @@ const executeQueuedAction = (state: GameState, action: QueuedAction): GameState 
       return executeSkillAction(baseState, action);
     case 'spell':
       return executeSpellAction(baseState, action);
+    case 'technique':
+      return executeTechniqueAction(baseState, action);
     case 'item':
       return executeItemAction(baseState, action);
     case 'wait':

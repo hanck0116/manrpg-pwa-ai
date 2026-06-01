@@ -11,12 +11,14 @@ import {
   type PendingChoice,
   type PendingChoiceOption,
   type PlayerSkill,
+  type PlayerTechnique,
   type RewardItem,
   type RewardState
 } from '../state/gameState';
 
-export const SAVE_KEY = 'manrpg-pwa-ai:save:v14';
+export const SAVE_KEY = 'manrpg-pwa-ai:save:v15';
 export const LEGACY_SAVE_KEYS = [
+  'manrpg-pwa-ai:save:v14',
   'manrpg-pwa-ai:save:v13',
   'manrpg-pwa-ai:save:v12',
   'manrpg-pwa-ai:save:v11',
@@ -31,7 +33,7 @@ export const LEGACY_SAVE_KEYS = [
   'manrpg-pwa-ai:save:v2',
   'manrpg-pwa-ai:save:v1'
 ];
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 
 type SavePayload = {
   saveVersion: number;
@@ -40,7 +42,7 @@ type SavePayload = {
 
 const validPhases = ['player-main', 'player-reaction', 'enemy-main', 'enemy-reaction', 'floor-cleared', 'reward-pending', 'level-up-pending', 'battle-ended'];
 const validRewardTypes: RewardItem['type'][] = ['coin', 'martial', 'magicBook', 'magicTicket', 'choice', 'multiItem', 'multi', 'reset', 'trait', 'special', 'item', 'equipment'];
-const validActionTypes = ['move', 'basic-attack', 'skill', 'spell', 'item', 'defend', 'wait'];
+const validActionTypes = ['move', 'basic-attack', 'skill', 'spell', 'technique', 'item', 'defend', 'wait'];
 const validReactionTypes = ['dodge', 'guard', 'counter'];
 const validEquipmentSlots: EquipmentItem['slot'][] = ['weapon', 'armor', 'accessory'];
 const validEquipmentStatKeys = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'appearance'];
@@ -48,6 +50,10 @@ const validEquipmentDerivedKeys = ['attack', 'maxHP', 'maxMP', 'mpRegen'];
 const validSkillResourceTypes: PlayerSkill['resourceType'][] = ['outer', 'inner', 'sword', 'magic', 'none'];
 const validSkillTimings: PlayerSkill['timing'][] = ['main', 'reaction', 'passive'];
 const validSkillEffectTypes: PlayerSkill['effectType'][] = ['damage', 'heal', 'guard', 'todo'];
+const validTechniqueKinds: PlayerTechnique['kind'][] = ['attack', 'defense', 'heal', 'buff', 'debuff', 'move', 'special'];
+const validSkillKinds: NonNullable<PlayerSkill['kind']>[] = [...validTechniqueKinds, 'passive'];
+const validTechniqueJudgeStats: PlayerTechnique['judgeStat'][] = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'appearance', 'none'];
+const validPassiveStats: NonNullable<PlayerSkill['passiveStat']>[] = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'appearance'];
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -201,6 +207,7 @@ const isValidQueuedAction = (value: unknown): boolean => {
     (value.steps === undefined || isNumber(value.steps)) &&
     (value.skillId === undefined || typeof value.skillId === 'string') &&
     (value.spellId === undefined || typeof value.spellId === 'string') &&
+    (value.techniqueId === undefined || typeof value.techniqueId === 'string') &&
     (value.itemId === undefined || typeof value.itemId === 'string') &&
     (value.reactionType === undefined || validReactionTypes.includes(value.reactionType as string))
   );
@@ -222,7 +229,36 @@ const isValidPlayerSkill = (value: unknown): value is PlayerSkill => {
     (value.range === undefined || isNumber(value.range)) &&
     (value.target === 'enemy' || value.target === 'self') &&
     validSkillEffectTypes.includes(value.effectType as PlayerSkill['effectType']) &&
-    (value.source === undefined || typeof value.source === 'string')
+    (value.source === undefined || typeof value.source === 'string') &&
+    (value.mpDelta === undefined || isNumber(value.mpDelta)) &&
+    (value.hpDelta === undefined || isNumber(value.hpDelta)) &&
+    (value.damageMultiplier === undefined || isNumber(value.damageMultiplier)) &&
+    (value.judgeStat === undefined || validTechniqueJudgeStats.includes(value.judgeStat as PlayerTechnique['judgeStat'])) &&
+    (value.judgeBonus === undefined || isNumber(value.judgeBonus)) &&
+    (value.kind === undefined || validSkillKinds.includes(value.kind as NonNullable<PlayerSkill['kind']>)) &&
+    (value.passiveStat === undefined || validPassiveStats.includes(value.passiveStat as NonNullable<PlayerSkill['passiveStat']>)) &&
+    (value.passiveValue === undefined || isNumber(value.passiveValue))
+  );
+};
+
+
+const isValidPlayerTechnique = (value: unknown): value is PlayerTechnique => {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.name === 'string' &&
+    typeof value.source === 'string' &&
+    validTechniqueKinds.includes(value.kind as PlayerTechnique['kind']) &&
+    isNumber(value.mpDelta) &&
+    isNumber(value.hpDelta) &&
+    isNumber(value.damageMultiplier) &&
+    value.damageMultiplier >= 0 &&
+    validTechniqueJudgeStats.includes(value.judgeStat as PlayerTechnique['judgeStat']) &&
+    isNumber(value.judgeBonus) &&
+    (value.description === undefined || typeof value.description === 'string')
   );
 };
 
@@ -302,6 +338,10 @@ const isValidGameState = (value: unknown): value is GameState => {
     value.spells.every(isValidLearnedSpell) &&
     Array.isArray(value.skills) &&
     value.skills.every(isValidPlayerSkill) &&
+    Array.isArray(value.techniqueSources) &&
+    value.techniqueSources.every((source) => typeof source === 'string') &&
+    Array.isArray(value.techniques) &&
+    value.techniques.every(isValidPlayerTechnique) &&
     isValidEquipmentLoadout(value.equipment) &&
     isValidMagicBookAttempt(value.magicBookAttempt) &&
     isValidAngelTrial(value.angelTrial) &&
@@ -334,7 +374,7 @@ export const saveGameStub = (state: GameState): string => {
 
   localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
 
-  return `저장: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리, 보유 마법, 스킬, 장비, 마법서 시도권, 천사의 시련을 localStorage에 기록했습니다.`;
+  return `저장: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리, 보유 마법, 스킬, 기술 제작 출처, 기술, 장비, 마법서 시도권, 천사의 시련을 localStorage에 기록했습니다.`;
 };
 
 export const loadGameStub = (): GameState => {

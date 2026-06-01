@@ -37,12 +37,13 @@ export type Character = {
 
 export type QueuedAction = {
   id: string;
-  type: 'move' | 'basic-attack' | 'skill' | 'spell' | 'item' | 'defend' | 'wait';
+  type: 'move' | 'basic-attack' | 'skill' | 'spell' | 'technique' | 'item' | 'defend' | 'wait';
   label: string;
   direction?: Direction;
   steps?: number;
   skillId?: string;
   spellId?: string;
+  techniqueId?: string;
   itemId?: string;
   reactionType?: 'dodge' | 'guard' | 'counter';
 };
@@ -109,6 +110,22 @@ export type LearnedSpell = {
 export type SkillResourceType = 'outer' | 'inner' | 'sword' | 'magic' | 'none';
 export type SkillTiming = 'main' | 'reaction' | 'passive';
 
+export type TechniqueKind = 'attack' | 'defense' | 'heal' | 'buff' | 'debuff' | 'move' | 'special';
+export type TechniqueJudgeStat = 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'appearance' | 'none';
+
+export type PlayerTechnique = {
+  id: string;
+  name: string;
+  source: string;
+  kind: TechniqueKind;
+  mpDelta: number;
+  hpDelta: number;
+  damageMultiplier: number;
+  judgeStat: TechniqueJudgeStat;
+  judgeBonus: number;
+  description?: string;
+};
+
 export type PlayerSkill = {
   id: string;
   name: string;
@@ -121,6 +138,14 @@ export type PlayerSkill = {
   target: 'enemy' | 'self';
   effectType: 'damage' | 'heal' | 'guard' | 'todo';
   source?: string;
+  mpDelta?: number;
+  hpDelta?: number;
+  damageMultiplier?: number;
+  judgeStat?: TechniqueJudgeStat;
+  judgeBonus?: number;
+  kind?: TechniqueKind | 'passive';
+  passiveStat?: Exclude<TechniqueJudgeStat, 'none'>;
+  passiveValue?: number;
 };
 
 export type EquipmentSlot = 'weapon' | 'armor' | 'accessory';
@@ -190,6 +215,8 @@ export type GameState = {
   inventory: RewardItem[];
   spells: LearnedSpell[];
   skills: PlayerSkill[];
+  techniqueSources: string[];
+  techniques: PlayerTechnique[];
   equipment: EquipmentLoadout;
   battleResult?: BattleResult;
   pendingReaction?: PendingReaction;
@@ -288,6 +315,8 @@ export const createInitialGameState = (): GameState => {
     inventory: [],
     spells: [],
     skills: [],
+    techniqueSources: [],
+    techniques: [],
     equipment: {},
     magicBookAttempt: {
       floor: 1,
