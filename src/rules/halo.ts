@@ -25,7 +25,7 @@ const labels: Record<HaloKind, string> = {
 };
 
 const descriptions: Record<HaloKind, string> = {
-  amplification: '한 가지 행동을 무한히 증폭시킨다. 층당 1번 사용 가능하며 수치 무한대 대신 안전한 최대 결과로 처리합니다.',
+  amplification: '한 가지 행동의 AI 묘사를 무한히 증폭시킨다. 실제 피해, 회복, 이동, 보상, 판정 결과는 바꾸지 않습니다. AI 자동 GM 서술이 켜져 있을 때 다음 주요 행동의 묘사 프롬프트에 무한 증폭 지시를 추가합니다.',
   extinction: '인지를 가진 생명체를 제외한 모든 것을 소멸시킨다. 층당 1번 사용 가능합니다.',
   birth: '원하는 물건을 창조한다. 제약 없음. 층당 1번 사용 가능합니다.',
   fusion: '원하는 두 가지 기술을 결합시켜 1회성 기술로 사용합니다.',

@@ -20,8 +20,9 @@ import {
   type StatusEffect
 } from '../state/gameState';
 
-export const SAVE_KEY = 'manrpg-pwa-ai:save:v17';
+export const SAVE_KEY = 'manrpg-pwa-ai:save:v18';
 export const LEGACY_SAVE_KEYS = [
+  'manrpg-pwa-ai:save:v17',
   'manrpg-pwa-ai:save:v16',
   'manrpg-pwa-ai:save:v15',
   'manrpg-pwa-ai:save:v14',
@@ -39,7 +40,7 @@ export const LEGACY_SAVE_KEYS = [
   'manrpg-pwa-ai:save:v2',
   'manrpg-pwa-ai:save:v1'
 ];
-export const SAVE_VERSION = 17;
+export const SAVE_VERSION = 18;
 
 type SavePayload = {
   saveVersion: number;
@@ -339,8 +340,9 @@ const isValidHaloState = (value: unknown): value is HaloState => {
     Object.entries(value.usedThisFloor).every(([key, recordValue]) => validHaloKinds.includes(key as HaloKind) && typeof recordValue === 'boolean') &&
     (value.pendingAmplification === undefined ||
       (isObject(value.pendingAmplification) &&
-        (value.pendingAmplification.actionId === undefined || typeof value.pendingAmplification.actionId === 'string') &&
-        (value.pendingAmplification.description === undefined || typeof value.pendingAmplification.description === 'string'))) &&
+        (value.pendingAmplification.description === undefined || typeof value.pendingAmplification.description === 'string') &&
+        isNumber(value.pendingAmplification.createdTurn) &&
+        typeof value.pendingAmplification.consumeOnNextNarration === 'boolean')) &&
     (value.pendingDesire === undefined ||
       (isObject(value.pendingDesire) && typeof value.pendingDesire.result === 'string' && isNumber(value.pendingDesire.actionDisabledTurns))) &&
     (value.satanActive === undefined || typeof value.satanActive === 'boolean') &&

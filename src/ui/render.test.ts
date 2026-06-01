@@ -179,6 +179,114 @@ describe('automatic AI narration', () => {
     expect(applied[1].log.map((entry) => entry.message)).toContain('AI 묘사');
     expect(applied[1].log.map((entry) => entry.message)).toContain('AI 로그');
   });
+
+  it('passes pending amplification to narration and consumes it only after successful AI narration', async () => {
+    setAISettings({ enabled: true });
+    const base = createInitialGameState();
+    const state: GameState = {
+      ...base,
+      halo: {
+        ...base.halo,
+        selectedKind: 'amplification',
+        pendingAmplification: { description: '검격', createdTurn: base.turn, consumeOnNextNarration: true }
+      }
+    };
+    const applied: GameState[] = [];
+
+    await applyStateWithAutoNarration(state, '증폭 테스트', (next) => applied.push(next));
+
+    expect(callLLM).toHaveBeenCalledWith('narrate', expect.objectContaining({
+      halo: expect.objectContaining({
+        selectedKind: 'amplification',
+        pendingAmplification: expect.objectContaining({
+          description: '검격',
+          instruction: expect.stringContaining('묘사를 무한히 증폭')
+        })
+      })
+    }));
+    expect(applied.at(-1)?.halo.pendingAmplification).toBeUndefined();
+    expect(applied.at(-1)?.log.map((entry) => entry.message)).toContain('증폭 묘사가 AI GM 서술에 반영되었습니다.');
+  });
+
+  it('keeps pending amplification when automatic narration is disabled or fails', async () => {
+    const base = createInitialGameState();
+    const state: GameState = {
+      ...base,
+      halo: {
+        ...base.halo,
+        pendingAmplification: { description: '검격', createdTurn: base.turn, consumeOnNextNarration: true }
+      }
+    };
+    const disabledApplied: GameState[] = [];
+    setAISettings({ enabled: false });
+
+    await applyStateWithAutoNarration(state, '비활성 테스트', (next) => disabledApplied.push(next));
+
+    expect(callLLM).not.toHaveBeenCalled();
+    expect(disabledApplied.at(-1)?.halo.pendingAmplification).toBeDefined();
+    expect(disabledApplied.at(-1)?.log.at(-1)?.message).toBe('AI 자동 GM 서술이 꺼져 있어 증폭 묘사는 대기 중입니다.');
+
+    vi.clearAllMocks();
+    vi.mocked(callLLM).mockRejectedValueOnce(new Error('network'));
+    const failedApplied: GameState[] = [];
+    setAISettings({ enabled: true });
+
+    await applyStateWithAutoNarration(state, '실패 테스트', (next) => failedApplied.push(next));
+
+    expect(failedApplied.at(-1)?.halo.pendingAmplification).toBeDefined();
+    expect(failedApplied.at(-1)?.log.at(-1)?.message).toContain('AI 자동 GM 서술 실패');
+  });
+
+
+  it('manual AI narration consumes pending amplification on success and keeps it on failure', async () => {
+    class TestButton {
+      dataset: Record<string, string>;
+      constructor(dataset: Record<string, string>) {
+        this.dataset = dataset;
+      }
+    }
+    vi.stubGlobal('HTMLButtonElement', TestButton);
+    setAISettings({ enabled: false });
+    const { root, getClickHandler } = makeRoot();
+    const base = createInitialGameState();
+    let state: GameState = {
+      ...base,
+      halo: {
+        ...base.halo,
+        pendingAmplification: { description: '수동 검격', createdTurn: base.turn, consumeOnNextNarration: true }
+      }
+    };
+    const setState = (next: GameState): void => {
+      state = next;
+    };
+
+    bindUI(root, () => state, setState);
+    await getClickHandler()({ target: new TestButton({ aiNarrate: '' }) });
+
+    expect(callLLM).toHaveBeenCalledWith('narrate', expect.objectContaining({
+      halo: expect.objectContaining({
+        pendingAmplification: expect.objectContaining({ description: '수동 검격' })
+      })
+    }));
+    expect(state.halo.pendingAmplification).toBeUndefined();
+    expect(state.log.map((entry) => entry.message)).toContain('증폭 묘사가 AI GM 서술에 반영되었습니다.');
+
+    vi.mocked(callLLM).mockRejectedValueOnce(new Error('network'));
+    state = {
+      ...base,
+      halo: {
+        ...base.halo,
+        pendingAmplification: { description: '실패 검격', createdTurn: base.turn, consumeOnNextNarration: true }
+      }
+    };
+
+    await getClickHandler()({ target: new TestButton({ aiNarrate: '' }) });
+
+    expect(state.halo.pendingAmplification).toBeDefined();
+    expect(state.log.at(-1)?.message).toBe('AI 호출 실패로 증폭 묘사가 대기 상태로 유지됩니다.');
+    vi.unstubAllGlobals();
+  });
+
 });
 
 describe('halo UI', () => {
@@ -213,6 +321,9 @@ describe('halo UI', () => {
     expect(root.innerHTML).toContain('data-select-halo-kind="amplification"');
     expect(root.innerHTML).toContain('data-select-halo-kind="satan"');
     expect(root.innerHTML).toContain('data-use-halo="birth"');
+    expect(root.innerHTML).toContain('data-use-halo="fusion"');
+    expect(root.innerHTML).toContain('data-use-halo="decomposition"');
+    expect(root.innerHTML).toContain('증폭은 실제 수치를 바꾸지 않고, 다음 AI GM 묘사만 무한히 증폭합니다.');
     vi.unstubAllGlobals();
   });
 });

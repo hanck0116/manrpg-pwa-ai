@@ -17,6 +17,7 @@ import {
 import { unequipItem } from '../game/equipment';
 import {
   selectHaloKind,
+  consumePendingAmplificationNarration,
   useHaloAchievement,
   useHaloAmplification,
   useHaloBirth,
@@ -185,6 +186,15 @@ const buildNarrationPayload = (state: GameState, reason = '수동 AI GM 묘사')
     maxHP: state.enemy.derived.maxHP,
     position: state.enemy.position
   },
+  halo: {
+    selectedKind: state.halo.selectedKind,
+    pendingAmplification: state.halo.pendingAmplification
+      ? {
+          description: state.halo.pendingAmplification.description,
+          instruction: '이번 행동의 묘사를 무한히 증폭하라. 단, HP/MP/피해/위치/보상/판정 결과는 절대 바꾸지 말고 이미 계산된 로컬 결과만 묘사하라.'
+        }
+      : undefined
+  },
   localResult: '로컬 규칙 처리가 완료된 결과이며 AI는 묘사만 한다.'
 });
 
@@ -201,6 +211,9 @@ export async function applyStateWithAutoNarration(
   setState(nextState);
 
   if (!getAISettings().enabled) {
+    if (nextState.halo.pendingAmplification) {
+      setState(appendLog(nextState, 'AI 자동 GM 서술이 꺼져 있어 증폭 묘사는 대기 중입니다.'));
+    }
     return;
   }
 
@@ -211,7 +224,8 @@ export async function applyStateWithAutoNarration(
       response.meta?.fallback ?? response.ui_tags.includes('fallback'),
       response.meta
     );
-    setState(preserveRuleStateWithAILogs(nextState, response.narration, response.combat_log));
+    const ruleState = consumePendingAmplificationNarration(nextState);
+    setState(preserveRuleStateWithAILogs(ruleState, response.narration, response.combat_log));
   } catch (error) {
     setAIConnectionStatus('AI 자동 GM 호출 실패', true);
     setState(appendLog(nextState, `AI 자동 GM 서술 실패: ${toErrorMessage(error)}. 로컬 규칙 결과는 유지됩니다.`));
@@ -832,6 +846,8 @@ const renderHaloPanel = (state: GameState, compact = false): string => {
         <h2>헤일로</h2>
         <p>현재 선택: <strong>${selected ? getHaloLabel(selected) : '없음'}</strong></p>
         <p class="muted">${selectedDescription}</p>
+        ${state.halo.pendingAmplification ? '<p class="muted">증폭 묘사 대기 중: 다음 AI GM 서술에 반영됩니다.</p>' : ''}
+        <p class="muted">증폭은 실제 수치를 바꾸지 않고, 다음 AI GM 묘사만 무한히 증폭합니다.</p>
         ${selected && selected !== 'satan' ? `<button type="button" data-use-halo="${selected}" ${useDisabled(selected)}>현재 헤일로 사용</button>` : ''}
         ${selected === 'satan' ? '<p class="muted">사탄은 선택형 패시브로 힘/민첩/체력 +10을 적용합니다.</p>' : ''}
       </section>
@@ -844,6 +860,8 @@ const renderHaloPanel = (state: GameState, compact = false): string => {
       <p>보유 상태: <strong>보유</strong></p>
       <p>현재 선택: <strong>${selected ? getHaloLabel(selected) : '없음'}</strong></p>
       <p class="muted">${selectedDescription}</p>
+      <p class="muted">증폭은 실제 수치를 바꾸지 않고, 다음 AI GM 묘사만 무한히 증폭합니다.</p>
+      ${state.halo.pendingAmplification ? `<p class="muted">증폭 묘사 대기 중: ${state.halo.pendingAmplification.description ?? '다음 주요 행동'}</p>` : ''}
       <div class="choice-grid halo-kind-grid">
         ${HALO_KINDS.map(
           (kind) => `<button type="button" class="choice ${selected === kind ? 'selected' : ''}" data-select-halo-kind="${kind}">${getHaloLabel(kind)}</button>`
@@ -863,8 +881,8 @@ const renderHaloPanel = (state: GameState, compact = false): string => {
           <button type="button" data-use-halo="birth" ${useDisabled('birth')}>탄생 사용</button>
           <label>결합 A<select data-halo-fusion-a>${state.techniques.map((technique) => `<option value="${technique.id}">${technique.name}</option>`).join('')}</select></label>
           <label>결합 B<select data-halo-fusion-b>${state.techniques.map((technique) => `<option value="${technique.id}">${technique.name}</option>`).join('')}</select></label>
-          <button type="button" data-use-halo-fusion ${useDisabled('fusion')}>결합 사용</button>
-          <button type="button" data-use-halo-decomposition ${useDisabled('decomposition')}>분해 사용</button>
+          <button type="button" data-use-halo="fusion" ${useDisabled('fusion')}>결합 사용</button>
+          <button type="button" data-use-halo="decomposition" ${useDisabled('decomposition')}>분해 사용</button>
           <label>존재 개념<input data-halo-existence-concept placeholder="공간, 빛 등" /></label>
           <button type="button" data-use-halo="existence" ${useDisabled('existence')}>존재 사용</button>
           <button type="button" data-use-halo="achievement" ${useDisabled('achievement')}>성취 사용</button>
@@ -1220,27 +1238,23 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
             ? useHaloExtinction(haloState, getInputValue(root, '[data-halo-extinction-target]'))
             : useHalo === 'birth'
               ? useHaloBirth(haloState, getInputValue(root, '[data-halo-birth-item]'))
-              : useHalo === 'existence'
-                ? useHaloExistence(haloState, getInputValue(root, '[data-halo-existence-concept]'))
-                : useHalo === 'achievement'
-                  ? useHaloAchievement(haloState)
-                  : useHalo === 'desire'
-                    ? useHaloDesire(haloState, getInputValue(root, '[data-halo-desire-result]'), Number(getInputValue(root, '[data-halo-desire-disabled-turns]') || 0))
-                    : appendLog(haloState, '사탄 헤일로는 사용 버튼이 아니라 선택형 패시브입니다.');
-      await setStateWithAuto(nextState, '헤일로 사용 후');
-      return;
-    }
+              : useHalo === 'fusion'
+                ? useHaloFusion(haloState, getInputValue(root, '[data-halo-fusion-a]'), getInputValue(root, '[data-halo-fusion-b]'))
+                : useHalo === 'decomposition'
+                  ? useHaloDecomposition(haloState)
+                  : useHalo === 'existence'
+                    ? useHaloExistence(haloState, getInputValue(root, '[data-halo-existence-concept]'))
+                    : useHalo === 'achievement'
+                      ? useHaloAchievement(haloState)
+                      : useHalo === 'desire'
+                        ? useHaloDesire(haloState, getInputValue(root, '[data-halo-desire-result]'), Number(getInputValue(root, '[data-halo-desire-disabled-turns]') || 0))
+                        : appendLog(haloState, '사탄 헤일로는 사용 버튼이 아니라 선택형 패시브입니다.');
 
-    if (target.dataset.useHaloFusion !== undefined) {
-      await setStateWithAuto(
-        useHaloFusion(getState(), getInputValue(root, '[data-halo-fusion-a]'), getInputValue(root, '[data-halo-fusion-b]')),
-        '헤일로 사용 후'
-      );
-      return;
-    }
-
-    if (target.dataset.useHaloDecomposition !== undefined) {
-      await setStateWithAuto(useHaloDecomposition(getState()), '헤일로 사용 후');
+      if (useHalo === 'amplification') {
+        setState(nextState);
+      } else {
+        await setStateWithAuto(nextState, '헤일로 사용 후');
+      }
       return;
     }
 
@@ -1405,12 +1419,14 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     }
 
     if (target.dataset.aiNarrate !== undefined) {
+      const stateBeforeNarration = getState();
       try {
-        const response = await callLLM('narrate', buildNarrationPayload(getState()));
+        const response = await callLLM('narrate', buildNarrationPayload(stateBeforeNarration));
         setAIConnectionStatus(response.meta?.fallback ? 'AI 연결 실패 또는 fallback 사용' : 'AI GM 묘사 생성 완료', response.meta?.fallback ?? response.ui_tags.includes('fallback'), response.meta);
-        setState(appendAILogs(getState(), response.narration, response.combat_log));
+        const ruleState = consumePendingAmplificationNarration(stateBeforeNarration);
+        setState(appendAILogs(ruleState, response.narration, response.combat_log));
       } catch (error) {
-        logError(error);
+        setState(appendLog(stateBeforeNarration, stateBeforeNarration.halo.pendingAmplification ? 'AI 호출 실패로 증폭 묘사가 대기 상태로 유지됩니다.' : `오류: ${toErrorMessage(error)}`));
       }
       return;
     }

@@ -45,41 +45,28 @@ export const useHaloAmplification = (state: GameState, description = '다음 플
       ...state,
       halo: {
         ...state.halo,
-        pendingAmplification: { description }
+        pendingAmplification: {
+          description: description.trim() || undefined,
+          createdTurn: state.turn,
+          consumeOnNextNarration: true
+        }
       }
     }, 'amplification'),
-    `증폭: ${description}을(를) 무한히 증폭할 준비를 마쳤습니다.`
+    '증폭: 다음 주요 행동의 AI 묘사가 무한히 증폭됩니다. 실제 수치와 판정 결과는 변경되지 않습니다.'
   );
 };
 
-export const applyPendingAmplificationToDamage = (state: GameState): GameState => {
+export const consumePendingAmplificationNarration = (state: GameState): GameState => {
   if (!state.halo.pendingAmplification) return state;
 
   return logHalo(
     {
       ...state,
-      enemy: { ...state.enemy, hp: 0 },
       halo: { ...state.halo, pendingAmplification: undefined }
     },
-    '증폭: 행동이 무한히 증폭되어 적을 압도했습니다.'
+    '증폭 묘사가 AI GM 서술에 반영되었습니다.'
   );
 };
-
-export const applyPendingAmplificationToHeal = (state: GameState): GameState => {
-  if (!state.halo.pendingAmplification) return state;
-
-  return logHalo(
-    {
-      ...state,
-      player: { ...state.player, hp: state.player.derived.maxHP, mp: state.player.derived.maxMP },
-      halo: { ...state.halo, pendingAmplification: undefined }
-    },
-    '증폭: 회복 행동이 무한히 증폭되어 HP/MP가 최대치가 되었습니다.'
-  );
-};
-
-export const noteAmplificationNotApplicable = (state: GameState): GameState =>
-  state.halo.pendingAmplification ? appendLog(state, '증폭 적용 대상이 아닙니다. 증폭 대기는 유지됩니다.') : state;
 
 export const useHaloExtinction = (state: GameState, targetText: string): GameState => {
   const check = canUseHalo(state, 'extinction');
