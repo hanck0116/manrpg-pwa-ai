@@ -12,6 +12,7 @@ import {
   useHaloFusion
 } from './halo';
 import { createInitialGameState, type GameState } from '../state/gameState';
+import { createPlayerSkill } from '../rules/skill';
 
 const battleHalo = (selectedKind: GameState['halo']['selectedKind'] = 'amplification'): GameState => {
   const state = createInitialGameState();
@@ -31,13 +32,61 @@ describe('game halo effects', () => {
     expect(satan.player.derived.basicAtk).toBeGreaterThan(refreshPlayer(battleHalo('birth')).player.derived.basicAtk);
   });
 
-  it('amplifies next damage action to enemy hp 0 without non-finite values', () => {
+  it('creates pending amplification and marks it used without changing finite rule numbers', () => {
     const prepared = useHaloAmplification(battleHalo('amplification'), '기본 공격');
-    const queued = enqueueAction(prepared, { id: 'a', type: 'basic-attack', label: '기본 공격' });
-    const result = executeActionQueue(queued);
-    expect(result.enemy.hp).toBe(0);
-    expect(result.halo.pendingAmplification).toBeUndefined();
+
+    expect(prepared.halo.pendingAmplification).toMatchObject({
+      description: '기본 공격',
+      createdTurn: prepared.turn,
+      consumeOnNextNarration: true
+    });
+    expect(prepared.halo.usedThisFloor.amplification).toBe(true);
+    expect(Number.isFinite(prepared.enemy.hp)).toBe(true);
+    expect(Number.isFinite(prepared.player.hp)).toBe(true);
+    expect(Number.isFinite(prepared.player.mp)).toBe(true);
+  });
+
+  it('does not alter basic attack damage after amplification use', () => {
+    const base = battleHalo('amplification');
+    const expected = executeActionQueue(enqueueAction(base, { id: 'a', type: 'basic-attack', label: '기본 공격' }));
+    const prepared = useHaloAmplification(base, '기본 공격');
+    const result = executeActionQueue(enqueueAction(prepared, { id: 'a', type: 'basic-attack', label: '기본 공격' }));
+
+    expect(result.enemy.hp).toBe(expected.enemy.hp);
+    expect(result.halo.pendingAmplification).toBeDefined();
     expect(Number.isFinite(result.enemy.hp)).toBe(true);
+  });
+
+  it('does not alter skill, spell, technique, or healing results after amplification use', () => {
+    const damageSkill = createPlayerSkill({ name: '외공 공격', resourceType: 'none', timing: 'main', effectType: 'damage', multiplier: 1 });
+    const healSkill = createPlayerSkill({ name: '내공 회복', resourceType: 'none', timing: 'main', effectType: 'heal', target: 'self', multiplier: 1 });
+    const technique = { id: 't1', name: '즉시 기술', source: '공법', kind: 'attack' as const, mpDelta: 0, hpDelta: 0, damageMultiplier: 1, judgeStat: 'none' as const, judgeBonus: 0 };
+    const spell = { id: 's1', name: '파이어 애로우', circle: 2, grade: '기초' };
+    const base = {
+      ...battleHalo('amplification'),
+      player: { ...battleHalo('amplification').player, hp: 5 },
+      skills: [damageSkill, healSkill],
+      techniques: [technique],
+      spells: [spell]
+    };
+
+    const cases = [
+      { type: 'skill' as const, skillId: damageSkill.id, label: '피해 스킬' },
+      { type: 'skill' as const, skillId: healSkill.id, label: '회복 스킬' },
+      { type: 'spell' as const, spellId: spell.id, label: '마법' },
+      { type: 'technique' as const, techniqueId: technique.id, label: '기술' }
+    ];
+
+    for (const action of cases) {
+      const expected = executeActionQueue(enqueueAction(base, { id: `expected-${action.label}`, ...action }));
+      const result = executeActionQueue(enqueueAction(useHaloAmplification(base, action.label), { id: `actual-${action.label}`, ...action }));
+
+      expect(result.enemy.hp).toBe(expected.enemy.hp);
+      expect(result.player.hp).toBe(expected.player.hp);
+      expect(result.player.mp).toBe(expected.player.mp);
+      expect(result.halo.pendingAmplification).toBeDefined();
+      expect([result.enemy.hp, result.player.hp, result.player.mp].every(Number.isFinite)).toBe(true);
+    }
   });
 
   it('birth creates known and custom items', () => {

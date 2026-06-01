@@ -1,4 +1,4 @@
-import { applyPendingAmplificationToDamage, applyPendingAmplificationToHeal, hasActiveDesireCost, noteAmplificationNotApplicable } from './halo';
+import { hasActiveDesireCost } from './halo';
 import { useBattleInventoryItem } from './inventory';
 import { moveCharacterSteps } from './movement';
 import { resolveBasicAttack } from '../rules/combat';
@@ -123,7 +123,7 @@ const executeSpellAction = (state: GameState, action: QueuedAction): GameState =
     result.log
   );
 
-  return applyPendingAmplificationToDamage(nextState);
+  return nextState;
 };
 
 
@@ -150,7 +150,7 @@ const executeTechniqueAction = (state: GameState, action: QueuedAction): GameSta
     result.log
   );
 
-  return technique.kind === 'heal' ? applyPendingAmplificationToHeal(nextState) : applyPendingAmplificationToDamage(nextState);
+  return nextState;
 };
 
 const executeItemAction = (state: GameState, action: QueuedAction): GameState => {
@@ -187,7 +187,7 @@ const executeSkillAction = (state: GameState, action: QueuedAction): GameState =
     result.log
   );
 
-  return skill.effectType === 'heal' ? applyPendingAmplificationToHeal(nextState) : skill.effectType === 'damage' ? applyPendingAmplificationToDamage(nextState) : nextState;
+  return nextState;
 };
 
 const executeQueuedAction = (state: GameState, action: QueuedAction): GameState => {
@@ -204,29 +204,25 @@ const executeQueuedAction = (state: GameState, action: QueuedAction): GameState 
 
   switch (action.type) {
     case 'move':
-      return noteAmplificationNotApplicable(moveCharacterSteps(baseState, baseState.player.id, action.direction ?? 'up', action.steps ?? 1));
+      return moveCharacterSteps(baseState, baseState.player.id, action.direction ?? 'up', action.steps ?? 1);
     case 'basic-attack': {
       const result = resolveBasicAttack(baseState.player, baseState.enemy);
 
-      return applyPendingAmplificationToDamage(
-        appendLog(
-          {
-            ...baseState,
-            enemy: { ...baseState.enemy, hp: result.targetHp }
-          },
-          result.log
-        )
+      return appendLog(
+        {
+          ...baseState,
+          enemy: { ...baseState.enemy, hp: result.targetHp }
+        },
+        result.log
       );
     }
     case 'defend':
-      return noteAmplificationNotApplicable(
-        appendLog(
-          {
-            ...baseState,
-            player: { ...baseState.player, guarding: true }
-          },
-          '플레이어가 방어 자세를 취했습니다.'
-        )
+      return appendLog(
+        {
+          ...baseState,
+          player: { ...baseState.player, guarding: true }
+        },
+        '플레이어가 방어 자세를 취했습니다.'
       );
     case 'skill':
       return executeSkillAction(baseState, action);
@@ -237,7 +233,7 @@ const executeQueuedAction = (state: GameState, action: QueuedAction): GameState 
     case 'item':
       return executeItemAction(baseState, action);
     case 'wait':
-      return noteAmplificationNotApplicable(appendLog(baseState, '플레이어가 대기했습니다.'));
+      return appendLog(baseState, '플레이어가 대기했습니다.');
   }
 };
 

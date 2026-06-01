@@ -132,8 +132,9 @@ export type HaloState = {
   selectedKind?: HaloKind;
   usedThisFloor: Partial<Record<HaloKind, boolean>>;
   pendingAmplification?: {
-    actionId?: string;
     description?: string;
+    createdTurn: number;
+    consumeOnNextNarration: boolean;
   };
   pendingDesire?: {
     result: string;

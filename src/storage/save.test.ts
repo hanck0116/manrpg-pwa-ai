@@ -17,11 +17,11 @@ const createLocalStorage = () => {
   };
 };
 
-describe('saveVersion 17', () => {
-  it('stores saveVersion 17', () => {
+describe('saveVersion 18', () => {
+  it('stores saveVersion 18', () => {
     vi.stubGlobal('localStorage', createLocalStorage());
 
-    expect(saveGameStub(createInitialGameState())).toContain('saveVersion 17');
+    expect(saveGameStub(createInitialGameState())).toContain('saveVersion 18');
 
     vi.unstubAllGlobals();
   });
@@ -128,7 +128,7 @@ describe('saveVersion 17', () => {
       halo: {
         selectedKind: 'desire' as const,
         usedThisFloor: { amplification: true },
-        pendingAmplification: { description: '다음 행동' },
+        pendingAmplification: { description: '다음 행동', createdTurn: 3, consumeOnNextNarration: true },
         pendingDesire: { result: '결과', actionDisabledTurns: 2 },
         observedSpells: [{ id: 'spell-1', name: '관측', circle: 1, grade: '기초' }],
         history: ['헤일로 기록']
