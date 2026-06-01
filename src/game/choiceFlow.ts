@@ -1,4 +1,5 @@
 import { appendLog, type GameState, type LearnedSpell, type PendingChoiceOption } from '../state/gameState';
+import { applyChoiceItemResult } from './rewardApply';
 
 const maintenancePhases: GameState['phase'][] = ['reward-pending', 'level-up-pending', 'floor-cleared', 'battle-ended'];
 
@@ -65,12 +66,13 @@ export const confirmPendingChoice = (state: GameState, optionId: string): GameSt
     );
   }
 
-  // TODO: choiceItem effects must be implemented per original source rule before mutating inventory or stats.
-  return appendLog(
+  return applyChoiceItemResult(
     {
       ...state,
       pendingChoice: undefined
     },
-    `${state.pendingChoice.sourceItemName}: ${option.value}을 선택했습니다. 실제 효과는 원본 규칙 확인 후 구현 예정입니다.`
+    state.pendingChoice.sourceItemId,
+    state.pendingChoice.sourceItemName,
+    option.value
   );
 };

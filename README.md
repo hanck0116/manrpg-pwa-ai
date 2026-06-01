@@ -197,9 +197,9 @@ npm run build
   - 계단 미구현 표시
 - 전투 로그 최근 20개 표시
 - 저장/불러오기
-  - `saveVersion: 11`
+  - `saveVersion: 14`
   - `floor`, `rewardState`, `inventory`, `spells`, `levelUpPending`, `pendingReaction`, `pendingChoice`를 포함한 현재 구조만 유효 저장으로 취급
-  - saveVersion 13가 아니거나 깨진 저장 데이터는 초기 상태로 복구
+  - saveVersion 14가 아니거나 깨진 저장 데이터는 초기 상태로 복구
   - actionQueue와 `spellId`/`itemId`/`reactionType` 저장/복구
 - 접이식 AI 설정 패널
 - Cloudflare Worker relay 1차
@@ -338,10 +338,10 @@ npm run build
 - `magicBook`은 지혜 판정으로 습득하고 실패 시 유지됩니다.
 - `magicTicket` random은 판정 없이 등급 범위 마법 1개를 지급하고 사용한 권을 제거합니다.
 - `magicTicket` select는 판정 없이 등급 범위 마법 목록을 선택 UI로 표시하고, 확정 시 선택한 마법을 지급한 뒤 사용한 권을 제거합니다.
-- `choice` 선택권은 1차 UI만 구현했습니다. 선택 결과는 로그로 기록하지만, 원본별 실제 효과는 창작하지 않고 인벤토리를 유지합니다.
+- `choice` 선택권은 1차 실제 효과를 구현했습니다. 50코인, 명확한 아이템/마법 티켓/특성 선택은 적용하고, 원본 효과가 불명확한 선택지는 아이템화하되 효과를 창작하지 않습니다.
 - 적의 인접 공격은 즉시 피해를 적용하지 않고 `player-reaction`으로 진입합니다. 회피/방어/카운터/반응 안 함은 행동 큐를 소모하지 않는 1차 구현입니다.
 - 플레이어의 방어 행동은 적의 다음 공격 1회 판정까지 유지되고, 공격/반응 처리 후 해제됩니다.
-- 저장 구조는 `saveVersion: 10`이며 `spellId`, `itemId`, `reactionType`, `pendingReaction`, `pendingChoice`, `magicTicket`, `choice`, `multiItem`을 검증합니다.
+- 저장 구조는 `saveVersion: 14`이며 `spellId`, `itemId`, `reactionType`, `pendingReaction`, `pendingChoice`, `magicTicket`, `choice`, `multiItem`을 검증합니다.
 - Vitest 기반 `npm run test`를 추가했습니다.
 
 검증:
@@ -353,7 +353,7 @@ npm run build
 
 현재 스킬은 원본 통합본에서 확인한 "스킬 피해 배수를 최종 공격 피해에 곱한다"는 방향만 1차로 반영했습니다. 원본에서 세부 산식이 확정되지 않은 효과는 임의로 확장하지 않고 TODO로 남깁니다.
 
-- 보유 스킬 구조가 `GameState.skills`에 추가되었고 현재 저장 구조는 `saveVersion: 13`입니다.
+- 보유 스킬 구조가 `GameState.skills`에 추가되었고 현재 저장 구조는 `saveVersion: 14`입니다.
 - 행동 큐의 스킬 행동은 `skillId`로 보유 스킬을 참조합니다.
 - 스킬 제작은 정비 단계(`floor-cleared`, `reward-pending`, `level-up-pending`, `battle-ended`)에서만 가능합니다.
 - 1차 피해 스킬은 외공/검기/마법/없음 계열의 기준값에 배율을 곱해 적 1명에게 적용합니다.
@@ -374,7 +374,7 @@ npm run build
 
 원본에는 `장비목록`과 장비/아이템 판매 흐름이 확인되지만, 슬롯형 장비의 확정 효과와 일반 보상/상점 등장 규칙은 아직 명확하지 않습니다. 그래서 이번 단계에서는 원본에 없는 효과를 만들지 않고, 보유/착용/해제/판매/파생 수치 반영 구조만 먼저 구현했습니다.
 
-- 저장 구조는 `saveVersion: 13`입니다.
+- 저장 구조는 `saveVersion: 14`입니다.
 - `GameState.equipment`에 `weapon`, `armor`, `accessory` 슬롯을 저장합니다.
 - `RewardItem.equipment`로 인벤토리 장비 아이템을 표현합니다.
 - 장비 착용/해제는 정비 단계(`floor-cleared`, `reward-pending`, `level-up-pending`, `battle-ended`)에서만 가능합니다.
@@ -391,10 +391,22 @@ npm run build
 - 착용 중 장비 판매/교체 UX 정리
 
 
-## 이번 단계 반영 사항 (saveVersion 13)
+## 이번 단계 반영 사항 (saveVersion 14)
 
 - 맵은 랜덤 생성 없이 항상 동일한 11x11 고정 맵입니다. 플레이어는 1명, 적은 1명이며 보스몹은 없습니다.
 - 마법서(`magicBook`) 습득 시도는 층마다 첫 1회 무료이고, 같은 층의 2번째 시도부터 1회당 1코인을 사용합니다. 코인이 없으면 시도하지 않으며, 실패한 마법서는 유지되고 다음 층 진입 시 무료 시도권이 초기화됩니다.
 - `AI 자동 GM 서술 사용`을 켜면 주요 행동 후 AI가 이미 계산된 로컬 결과를 짧게 묘사합니다. AI는 HP/MP/피해/보상/위치/스탯/인벤토리를 수정하지 않습니다.
-- 모바일 UI는 전투/시트지/정비/천사의 시련/AI/로그 탭으로 분리되었습니다. 천사의 시련은 다음 단계 구현 placeholder입니다.
-- 저장 키와 저장 구조는 `saveVersion 13`입니다.
+- 모바일 UI는 전투/시트지/정비/천사의 시련/AI/로그 탭으로 분리되었습니다. 천사의 시련은 원본 ANGEL_TABLE 기반 점수 보상 지급을 지원합니다.
+- 저장 키와 저장 구조는 `saveVersion 14`입니다.
+
+## 이번 단계 반영 사항 (saveVersion 14)
+
+- 저장 키와 저장 구조는 `saveVersion 14`입니다. `angelTrial.claimedScores`, `angelTrial.lastScore`, `angelTrial.lastResult`를 저장/검증합니다.
+- 플레이어는 1명, 적은 1명이며 보스몹은 만들지 않습니다. 맵은 기존과 동일한 11x11 고정 맵을 유지하고 랜덤 맵을 만들지 않습니다.
+- 천사의 시련 탭은 실제 보상 지급을 지원합니다. 현재 기본 공격력 또는 직접 입력한 0 이상 정수 시련값으로 `ANGEL_TABLE`의 점수 이하 보상을 지급하며, 이미 획득한 단계는 중복 지급하지 않습니다.
+- 천사의 시련은 전투나 보스전이 아닙니다. 적 생성, 보스 생성, 다중 적 전투, AI 판정 없이 점수 기반 보상 처리만 수행합니다.
+- choice 선택권 실제 효과 1차를 구현했습니다. `50코인`, 무공/마법서 티켓류 아이템 지급, 명확한 특성 선택, 미구현 선택지의 인벤토리 아이템화를 처리합니다.
+- 특성 선택 제한을 적용합니다. 중급 정령은 하급 정령, 상급 정령은 중급 정령, 정령왕은 하급/중급/상급 정령을 요구하며 중복 특성은 추가하지 않습니다.
+- trait 아이템 사용 1차를 구현했습니다. 사용 가능한 특성 아이템은 보유 특성에 추가하고 인벤토리에서 제거하며, 아직 구현되지 않은 특성 효과는 임의로 만들지 않고 TODO 로그로 남깁니다.
+- 전투 탭은 빠르게 쓰도록 보유 스킬/큐 추가만 표시하고 스킬 생성 UI를 제거했습니다. 시트지 탭은 스킬 생성, 보유 마법, 장비 패널을 포함합니다.
+- AI 자동 GM 서술은 여전히 규칙 판정과 수치 변경에 관여하지 않으며, 천사의 시련 실행 후에도 묘사만 추가합니다.

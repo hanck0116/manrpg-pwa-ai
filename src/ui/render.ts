@@ -1,4 +1,5 @@
 import { enqueueAction, removeQueuedAction } from '../game/actionQueue';
+import { runAngelTrialWithAttack, runAngelTrialWithManualScore, resetAngelTrialClaims } from '../game/angelTrial';
 import { cancelPendingChoice, confirmPendingChoice } from '../game/choiceFlow';
 import { clearFloorRecovery, enterNextFloor } from '../game/floor';
 import {
@@ -23,6 +24,7 @@ import { fixedMap, MAP_SIZE } from '../map/fixedMap';
 import { getMinimapSummary } from '../map/minimap';
 import { getDirectionLabel } from '../game/movement';
 import { loadGameStub, saveGameStub } from '../storage/save';
+import { getAngelRewards, getUnclaimedAngelRewards } from '../rules/angelTrial';
 import { buyShopItem, canBuyShopItem, getShopItems } from '../rules/shop';
 import { describeSpell } from '../rules/spell';
 import { callLLM } from '../ai/router';
@@ -521,7 +523,7 @@ const renderPendingChoicePanel = (state: GameState): string => {
   const guidance =
     state.pendingChoice.kind === 'magicTicketSelect'
       ? '획득할 마법을 선택하세요.'
-      : '선택권 효과는 원본 규칙 확인 후 단계적으로 구현됩니다.';
+      : '명확한 원본 선택권 효과는 즉시 적용하고, 불명확한 효과는 아이템화합니다.';
 
   return `
     <section class="panel pending-choice-panel">
@@ -570,7 +572,33 @@ const renderKnownSpells = (state: GameState): string => `
   </section>
 `;
 
-const renderKnownSkills = (state: GameState): string => {
+const renderKnownSkillsForBattle = (state: GameState): string => {
+  const canQueueSkill = state.phase === 'player-main' && !state.setupMode && !state.levelUpPending;
+
+  return `
+    <section class="panel skills-panel">
+      <details>
+        <summary>보유 스킬 (${state.skills.length})</summary>
+        ${
+          state.skills.length === 0
+            ? '<p class="muted">보유 스킬이 없습니다.</p>'
+            : `<ul class="inventory-list">${state.skills
+                .map(
+                  (skill) => `
+                    <li>
+                      <span>${skill.name} / ${skill.resourceType} / ${skill.timing} / ${skill.effectType} / ${skill.multiplier}배</span>
+                      <button type="button" data-add-skill="${skill.id}" ${canQueueSkill && skill.timing === 'main' ? '' : 'disabled'}>큐에 추가</button>
+                    </li>
+                  `
+                )
+                .join('')}</ul>`
+        }
+      </details>
+    </section>
+  `;
+};
+
+const renderSkillManagement = (state: GameState): string => {
   const canQueueSkill = state.phase === 'player-main' && !state.setupMode && !state.levelUpPending;
   const canCreate = ['floor-cleared', 'reward-pending', 'level-up-pending', 'battle-ended'].includes(state.phase);
 
@@ -770,7 +798,7 @@ const renderBattleTab = (state: GameState): string => `
       ${renderActionButtons(state)}
     </div>
     <div>
-      ${renderKnownSkills(state)}
+      ${renderKnownSkillsForBattle(state)}
       ${renderKnownSpells(state)}
       ${renderBattleItems(state)}
       ${renderEnemyCompact(state)}
@@ -784,8 +812,9 @@ const renderSheetTab = (state: GameState): string => `
     ${renderCharacterCard(state.player)}
     ${renderStatAllocationPanel(state)}
     ${renderLevelUpAllocationPanel(state)}
-    ${renderKnownSkills(state)}
+    ${renderSkillManagement(state)}
     ${renderKnownSpells(state)}
+    ${renderEquipmentPanel(state)}
   </section>
 `;
 
@@ -802,17 +831,48 @@ const renderMaintenanceTab = (state: GameState): string => `
   </section>
 `;
 
-const renderTrialTab = (): string => `
-  <section class="tab-panel" data-tab-panel="trial">
-    <section class="panel">
-      <h2>천사의 시련</h2>
-      <p>천사의 시련은 다음 단계에서 구현 예정입니다.</p>
-      <p class="muted">TODO: 나중에 특수 보상/선택권/시련 보상을 연결할 영역입니다. 이번 단계에서는 보스몹, 다중 적, 새 규칙을 만들지 않습니다.</p>
-    </section>
-  </section>
-`;
+const renderTrialTab = (state: GameState): string => {
+  const claimed = [...state.angelTrial.claimedScores].sort((a, b) => a - b);
+  const availableRewards = getAngelRewards(state.player.derived.attack);
+  const nextRewards = getUnclaimedAngelRewards(state.player.derived.attack, state.angelTrial.claimedScores);
 
-const renderAITab = (): string => `<section class="tab-panel" data-tab-panel="ai">${renderAISettings()}</section>`;
+  return `
+    <section class="tab-panel" data-tab-panel="trial">
+      <section class="panel">
+        <h2>천사의 시련</h2>
+        <p>기본 공격력 또는 직접 입력한 시련값으로 원본 ANGEL_TABLE 보상을 획득합니다.</p>
+        <p class="muted">천사의 시련은 전투/보스전이 아니며 적을 추가하지 않습니다. 점수 기반 보상 지급만 처리합니다.</p>
+        <dl>
+          <div><dt>현재 기본 공격 시련값</dt><dd>${state.player.derived.attack}</dd></div>
+          <div><dt>마지막 시련값</dt><dd>${state.angelTrial.lastScore ?? '없음'}</dd></div>
+          <div><dt>마지막 결과</dt><dd>${state.angelTrial.lastResult ?? '아직 실행하지 않았습니다.'}</dd></div>
+        </dl>
+        <div class="button-row">
+          <button type="button" data-angel-run-attack>기본 공격값으로 시련 적용</button>
+          <label>직접 시련값 <input type="number" min="0" step="1" data-angel-manual-score value="${state.player.derived.attack}" /></label>
+          <button type="button" data-angel-run-manual>직접값 적용</button>
+          <button type="button" data-angel-reset>획득 기록 초기화</button>
+        </div>
+      </section>
+      <section class="panel">
+        <details open>
+          <summary>획득 완료 단계 (${claimed.length})</summary>
+          <p>${claimed.length ? claimed.join(', ') : '없음'}</p>
+        </details>
+        <details>
+          <summary>현재 기본 공격값 기준 보상 (${availableRewards.length}) / 신규 ${nextRewards.length}</summary>
+          ${
+            availableRewards.length === 0
+              ? '<p class="muted">현재 기본 공격값으로 받을 수 있는 보상이 없습니다.</p>'
+              : `<ul class="inventory-list">${availableRewards.map((reward) => `<li>${reward.score}: ${reward.name}</li>`).join('')}</ul>`
+          }
+        </details>
+      </section>
+    </section>
+  `;
+};
+
+const renderAITab = (): string => `<section class="tab-panel" data-tab-panel="ai">${renderAISettings({ open: true })}</section>`;
 
 const renderLogTab = (state: GameState): string => `
   <section class="tab-panel" data-tab-panel="log">
@@ -824,7 +884,7 @@ const renderLogTab = (state: GameState): string => `
 const renderActiveTab = (state: GameState): string => {
   if (activeTab === 'sheet') return renderSheetTab(state);
   if (activeTab === 'maintenance') return renderMaintenanceTab(state);
-  if (activeTab === 'trial') return renderTrialTab();
+  if (activeTab === 'trial') return renderTrialTab(state);
   if (activeTab === 'ai') return renderAITab();
   if (activeTab === 'log') return renderLogTab(state);
   return renderBattleTab(state);
@@ -898,6 +958,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const reaction = target.dataset.reaction as 'dodge' | 'guard' | 'counter' | 'none' | undefined;
     const debugAction = target.dataset.debugAction;
     const tab = target.dataset.tab as AppTab | undefined;
+    const angelManualScore = Number(getInputValue(root, '[data-angel-manual-score]'));
 
     const setStateWithAuto = async (nextState: GameState, reason: string): Promise<void> => {
       await applyStateWithAutoNarration(nextState, reason, setState);
@@ -971,6 +1032,21 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
         logError(error);
         return;
       }
+    }
+
+    if (target.dataset.angelRunAttack !== undefined) {
+      await setStateWithAuto(runAngelTrialWithAttack(getState()), '천사의 시련 결과 후');
+      return;
+    }
+
+    if (target.dataset.angelRunManual !== undefined) {
+      await setStateWithAuto(runAngelTrialWithManualScore(getState(), angelManualScore), '천사의 시련 결과 후');
+      return;
+    }
+
+    if (target.dataset.angelReset !== undefined) {
+      setState(resetAngelTrialClaims(getState()));
+      return;
     }
 
     if (target.dataset.aiSaveSettings !== undefined) {

@@ -35,7 +35,7 @@ const renderProviderOptions = (selected: AIProvider): string =>
 
 const keyPlaceholder = (provider: AIProvider): string => (hasProviderKey(provider) ? '저장된 키 있음' : 'API 키 입력');
 
-export const renderAISettings = (): string => {
+export const renderAISettings = (options: { open?: boolean } = {}): string => {
   const settings = getAISettings();
   const savedKeyCount = (['groq', 'gemini', 'openrouter'] as AIProvider[]).filter((provider) => hasProviderKey(provider)).length;
   const usage = getAIUsageSummary();
@@ -44,7 +44,7 @@ export const renderAISettings = (): string => {
     .join(' · ');
 
   return `
-  <details class="panel ai-settings">
+  <details class="panel ai-settings" ${options.open ? 'open' : ''}>
     <summary>AI 설정</summary>
     <div class="ai-status-list">
       <span>AI 자동 GM 서술: <strong>${settings.enabled ? '사용' : '미사용'}</strong></span>

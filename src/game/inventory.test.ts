@@ -151,6 +151,39 @@ describe('inventory and shop', () => {
     expect(next.inventory).toHaveLength(1);
   });
 
+
+  it('uses a trait item to add the trait and remove the item', () => {
+    const item = makeItem('모델링');
+    const next = useInventoryItem({ ...maintenanceState(), inventory: [item] }, item.id);
+
+    expect(next.player.stats.traits).toContain('모델링');
+    expect(next.inventory).toHaveLength(0);
+  });
+
+  it('keeps a trait item when the trait is already owned', () => {
+    const item = makeItem('모델링');
+    const base = maintenanceState();
+    const next = useInventoryItem(
+      {
+        ...base,
+        player: { ...base.player, stats: { ...base.player.stats, traits: ['모델링'] } },
+        inventory: [item]
+      },
+      item.id
+    );
+
+    expect(next.player.stats.traits).toEqual(['모델링']);
+    expect(next.inventory).toHaveLength(1);
+  });
+
+  it('blocks restricted trait item use without prerequisite traits', () => {
+    const item = makeItem('중급 정령');
+    const next = useInventoryItem({ ...maintenanceState(), inventory: [item] }, item.id);
+
+    expect(next.player.stats.traits).not.toContain('중급 정령');
+    expect(next.inventory).toHaveLength(1);
+  });
+
   it('keeps choice item until choice UI exists', () => {
     const item = makeItem('아무 선택권');
     const state = {
@@ -241,7 +274,7 @@ describe('magicBook attempt cost', () => {
   });
 });
 
-describe('saveVersion 13', () => {
+describe('saveVersion 14', () => {
   it('round-trips latest reward item types and queued action fields', () => {
     const storage = new Map<string, string>();
     const localStorageStub = {
@@ -282,7 +315,7 @@ describe('saveVersion 13', () => {
       }
     };
 
-    expect(saveGameStub(state)).toContain('saveVersion 13');
+    expect(saveGameStub(state)).toContain('saveVersion 14');
     expect(loadGameStub().actionQueue[0]).toMatchObject(action);
     expect(loadGameStub().inventory.map((item) => item.type)).toEqual(['magicTicket', 'choice', 'multiItem']);
     expect(loadGameStub().pendingReaction).toMatchObject({ against: 'player', damage: 1 });

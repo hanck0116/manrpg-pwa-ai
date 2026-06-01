@@ -75,28 +75,83 @@ describe('choice flow', () => {
     expect(next.pendingChoice).toBeUndefined();
   });
 
-  it('records choiceItem selection without applying invented effects', () => {
-    const item = {
-      ...makeItem('테스트 선택권'),
-      type: 'choice' as const,
-      choices: ['외공서', '검기']
-    };
+  it('adds 50 coins and removes the choice item when selecting 50코인', () => {
+    const item = { ...makeItem('시분할/50코인 선택권'), type: 'choice' as const, choices: ['시분할', '50코인'] };
+    const pending = useInventoryItem({ ...maintenanceState(), inventory: [item] }, item.id);
+    const optionId = pending.pendingChoice?.options.find((option) => option.value === '50코인')?.id ?? '';
+    const next = confirmPendingChoice(pending, optionId);
+
+    expect(next.player.stats.coin).toBe(50);
+    expect(next.inventory).toHaveLength(0);
+    expect(next.pendingChoice).toBeUndefined();
+  });
+
+  it('adds martial item and removes the choice item when selecting 외공서', () => {
+    const item = { ...makeItem('외공서/내공서 선택권'), type: 'choice' as const, choices: ['외공서', '내공서'] };
     const pending = useInventoryItem({ ...maintenanceState(), inventory: [item] }, item.id);
     const optionId = pending.pendingChoice?.options[0]?.id ?? '';
     const next = confirmPendingChoice(pending, optionId);
 
     expect(next.inventory).toHaveLength(1);
-    expect(next.spells).toHaveLength(0);
-    expect(next.pendingChoice).toBeUndefined();
-    expect(next.log.at(-1)?.message).toContain('실제 효과는 원본 규칙 확인 후 구현 예정입니다.');
+    expect(next.inventory[0].name).toBe('외공서');
+    expect(next.inventory[0].type).toBe('martial');
   });
 
-  it('round-trips saveVersion 13 state with pendingChoice', () => {
+  it('adds selected trait to player stats', () => {
+    const item = { ...makeItem('묘리 선택권'), type: 'choice' as const, choices: ['모델링'] };
+    const pending = useInventoryItem({ ...maintenanceState(), inventory: [item] }, item.id);
+    const next = confirmPendingChoice(pending, pending.pendingChoice?.options[0]?.id ?? '');
+
+    expect(next.player.stats.traits).toContain('모델링');
+    expect(next.inventory).toHaveLength(0);
+  });
+
+  it('does not duplicate already owned traits', () => {
+    const item = { ...makeItem('묘리 선택권'), type: 'choice' as const, choices: ['모델링'] };
+    const state = {
+      ...maintenanceState(),
+      player: { ...maintenanceState().player, stats: { ...maintenanceState().player.stats, traits: ['모델링'] } },
+      inventory: [item]
+    };
+    const pending = useInventoryItem(state, item.id);
+    const next = confirmPendingChoice(pending, pending.pendingChoice?.options[0]?.id ?? '');
+
+    expect(next.player.stats.traits).toEqual(['모델링']);
+  });
+
+  it('blocks 중급 정령 without 하급 정령', () => {
+    const item = { ...makeItem('정령 선택권'), type: 'choice' as const, choices: ['중급 정령'] };
+    const pending = useInventoryItem({ ...maintenanceState(), inventory: [item] }, item.id);
+    const next = confirmPendingChoice(pending, pending.pendingChoice?.options[0]?.id ?? '');
+
+    expect(next.inventory).toHaveLength(1);
+    expect(next.player.stats.traits).not.toContain('중급 정령');
+  });
+
+  it('blocks 상급 정령 without 중급 정령', () => {
+    const item = { ...makeItem('정령 선택권'), type: 'choice' as const, choices: ['상급 정령'] };
+    const pending = useInventoryItem({ ...maintenanceState(), inventory: [item] }, item.id);
+    const next = confirmPendingChoice(pending, pending.pendingChoice?.options[0]?.id ?? '');
+
+    expect(next.inventory).toHaveLength(1);
+    expect(next.player.stats.traits).not.toContain('상급 정령');
+  });
+
+  it('blocks 정령왕 without all lower spirits', () => {
+    const item = { ...makeItem('정령 선택권'), type: 'choice' as const, choices: ['정령왕'] };
+    const pending = useInventoryItem({ ...maintenanceState(), inventory: [item] }, item.id);
+    const next = confirmPendingChoice(pending, pending.pendingChoice?.options[0]?.id ?? '');
+
+    expect(next.inventory).toHaveLength(1);
+    expect(next.player.stats.traits).not.toContain('정령왕');
+  });
+
+  it('round-trips saveVersion 14 state with pendingChoice', () => {
     vi.stubGlobal('localStorage', createLocalStorage());
     const item = makeItem('기초 마법서 선택권');
     const pending = useInventoryItem({ ...maintenanceState(), inventory: [item] }, item.id);
 
-    expect(saveGameStub(pending)).toContain('saveVersion 13');
+    expect(saveGameStub(pending)).toContain('saveVersion 14');
     expect(loadGameStub().pendingChoice).toMatchObject({
       kind: 'magicTicketSelect',
       sourceItemName: '기초 마법서 선택권'
