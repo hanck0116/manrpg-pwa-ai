@@ -20,6 +20,11 @@ const normalizeProxyResponse = (value: unknown): LLMResponse => {
       narration: typeof response.narration === 'string' ? response.narration : '',
       combat_log: Array.isArray(response.combat_log) ? response.combat_log.filter((entry): entry is string => typeof entry === 'string') : [],
       ui_tags: Array.isArray(response.ui_tags) ? response.ui_tags.filter((entry): entry is string => typeof entry === 'string') : [],
+      playerActionResult: response.playerActionResult,
+      enemyAction: response.enemyAction,
+      stateDeltas: response.stateDeltas,
+      nextChoices: response.nextChoices,
+      summaryUpdate: response.summaryUpdate,
       meta: typeof response.meta === 'object' && response.meta !== null ? response.meta : undefined
     };
   }

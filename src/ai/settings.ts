@@ -133,7 +133,7 @@ export const hasProviderKey = (provider: AIProvider, settings: AISettings = getA
   getProviderKey(provider, settings).trim().length > 0;
 
 export const getProviderOrder = (task: LLMTask, settings: AISettings = getAISettings()): AIProvider[] => {
-  if (task === 'summarize' || task === 'generate-skill') {
+  if (task === 'summarize' || task === 'generate-skill' || task === 'compact-summary') {
     return ['gemini', 'openrouter', 'groq'];
   }
 

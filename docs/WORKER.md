@@ -126,3 +126,12 @@ curl -X POST https://YOUR_WORKER.workers.dev/llm \
 ```
 
 키가 없거나 provider 호출이 실패하면 fallback 응답으로 게임 진행이 계속됩니다.
+
+## saveVersion 19 Worker/GM relay 정책
+
+- Worker는 계속 API relay 역할만 하며 DB 저장을 하지 않습니다. 저장 상태의 소유자는 브라우저 코드입니다.
+- `LLMTask`에 `gm-turn`, `enemy-action`, `compact-summary`를 추가했습니다. 기본 우선순위는 `gm-turn`/`enemy-action`은 Groq → OpenRouter → Gemini, `compact-summary`는 Gemini → OpenRouter → Groq입니다.
+- `gm-turn`은 TRPG 재미를 위해 provider `max_tokens`/`maxOutputTokens`를 500까지 허용하지만, prompt 길이 제한은 6000자 이하로 유지합니다.
+- API는 GM 진행/플레이어 행동 처리/적 행동 처리/묘사를 담당하지만, 전체 `GameState`, 전체 로그, 전체 적 상세를 받지 않습니다. 코드가 compact payload만 만들어 전달합니다.
+- 응답은 JSON이어야 하며 코드가 `stateDeltas`만 clamp하여 반영합니다. `maxHP`, `maxMP`, `level`, 장비 구조 같은 직접 상태 덮어쓰기는 무시됩니다.
+- 적은 화면에 상세 표시하지 않지만 내부적으로 항상 1명 유지합니다. 보스몹 없음, 랜덤맵 없음, 11x11 고정 맵 유지, 원본에 없는 효과 창작 금지를 Worker prompt에서도 유지합니다.

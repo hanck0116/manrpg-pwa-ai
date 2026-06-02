@@ -29,7 +29,10 @@ const defaultPriority: Record<LLMTask, ProviderName[]> = {
   interpret: ['groq', 'openrouter', 'gemini'],
   narrate: ['groq', 'openrouter', 'gemini'],
   summarize: ['gemini', 'openrouter', 'groq'],
-  'generate-skill': ['gemini', 'openrouter', 'groq']
+  'generate-skill': ['gemini', 'openrouter', 'groq'],
+  'gm-turn': ['groq', 'openrouter', 'gemini'],
+  'enemy-action': ['groq', 'openrouter', 'gemini'],
+  'compact-summary': ['gemini', 'openrouter', 'groq']
 };
 
 const providerEnvKeys = {
@@ -60,7 +63,7 @@ const jsonResponse = (body: unknown, env: Env, init: ResponseInit = {}): Respons
   });
 
 const isTask = (value: unknown): value is LLMTask =>
-  value === 'interpret' || value === 'narrate' || value === 'summarize' || value === 'generate-skill';
+  value === 'interpret' || value === 'narrate' || value === 'summarize' || value === 'generate-skill' || value === 'gm-turn' || value === 'enemy-action' || value === 'compact-summary';
 
 const isProvider = (value: unknown): value is ProviderName => value === 'groq' || value === 'gemini' || value === 'openrouter';
 
@@ -71,7 +74,12 @@ const normalizeResponse = (text: string): LLMResponse => {
     return {
       narration: typeof parsed.narration === 'string' ? parsed.narration : text,
       combat_log: Array.isArray(parsed.combat_log) ? parsed.combat_log.filter((entry): entry is string => typeof entry === 'string') : [],
-      ui_tags: Array.isArray(parsed.ui_tags) ? parsed.ui_tags.filter((entry): entry is string => typeof entry === 'string') : []
+      ui_tags: Array.isArray(parsed.ui_tags) ? parsed.ui_tags.filter((entry): entry is string => typeof entry === 'string') : [],
+      playerActionResult: parsed.playerActionResult,
+      enemyAction: parsed.enemyAction,
+      stateDeltas: parsed.stateDeltas,
+      nextChoices: parsed.nextChoices,
+      summaryUpdate: parsed.summaryUpdate
     };
   } catch {
     return {
@@ -124,7 +132,7 @@ const extractOpenAIText = async (response: Response): Promise<string> => {
   return text;
 };
 
-const callOpenAICompatible = async (endpoint: string, key: string, model: string, prompt: string): Promise<LLMResponse> => {
+const callOpenAICompatible = async (endpoint: string, key: string, model: string, prompt: string, task: LLMTask): Promise<LLMResponse> => {
   const response = await fetchWithTimeout(endpoint, {
     method: 'POST',
     headers: {
@@ -135,7 +143,7 @@ const callOpenAICompatible = async (endpoint: string, key: string, model: string
       model,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
-      max_tokens: 300
+      max_tokens: task === 'gm-turn' ? 500 : 300
     })
   });
 
@@ -146,7 +154,7 @@ const callOpenAICompatible = async (endpoint: string, key: string, model: string
   return normalizeResponse(await extractOpenAIText(response));
 };
 
-const callGemini = async (key: string, model: string, prompt: string): Promise<LLMResponse> => {
+const callGemini = async (key: string, model: string, prompt: string, task: LLMTask): Promise<LLMResponse> => {
   const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
     method: 'POST',
     headers: {
@@ -156,7 +164,7 @@ const callGemini = async (key: string, model: string, prompt: string): Promise<L
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 300
+        maxOutputTokens: task === 'gm-turn' ? 500 : 300
       }
     })
   });
@@ -185,14 +193,14 @@ const callProvider = async (provider: ProviderName, request: RelayRequest, env: 
   const model = request.model || defaultModels[provider];
 
   if (provider === 'groq') {
-    return callOpenAICompatible('https://api.groq.com/openai/v1/chat/completions', key, model, request.prompt);
+    return callOpenAICompatible('https://api.groq.com/openai/v1/chat/completions', key, model, request.prompt, request.task);
   }
 
   if (provider === 'openrouter') {
-    return callOpenAICompatible('https://openrouter.ai/api/v1/chat/completions', key, model, request.prompt);
+    return callOpenAICompatible('https://openrouter.ai/api/v1/chat/completions', key, model, request.prompt, request.task);
   }
 
-  return callGemini(key, model, request.prompt);
+  return callGemini(key, model, request.prompt, request.task);
 };
 
 const parseRelayRequest = async (request: Request): Promise<RelayRequest | Response> => {
@@ -262,6 +270,11 @@ const handleLlm = async (request: Request, env: Env): Promise<Response> => {
           narration: response.narration,
           combat_log: response.combat_log,
           ui_tags: [...response.ui_tags, `provider:${provider}`],
+          playerActionResult: response.playerActionResult,
+          enemyAction: response.enemyAction,
+          stateDeltas: response.stateDeltas,
+          nextChoices: response.nextChoices,
+          summaryUpdate: response.summaryUpdate,
           meta: {
             ...response.meta,
             provider,

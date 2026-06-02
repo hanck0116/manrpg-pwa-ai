@@ -238,6 +238,12 @@ export type AngelTrialState = {
   lastResult?: string;
 };
 
+export type HiddenEnemyHint = {
+  distanceHint: string;
+  threatHint: string;
+  conditionHint: string;
+};
+
 export type GameState = {
   setupMode: boolean;
   levelUpPending: boolean;
@@ -268,6 +274,13 @@ export type GameState = {
     freeUsed: boolean;
   };
   angelTrial: AngelTrialState;
+  sceneSummary: string;
+  recentEvents: string[];
+  nextChoices: string[];
+  hiddenEnemyHint: HiddenEnemyHint;
+  pendingPlayerInput?: string;
+  lastPlayerInput?: string;
+  gmTurnCount: number;
 };
 
 export const createCharacter = (
@@ -348,6 +361,15 @@ export const createInitialGameState = (): GameState => {
         message: `고정 11x11 맵에 플레이어 1명과 적 1명이 배치되었습니다. 캐릭터 생성에서 총 스탯 60이 되도록 54포인트를 분배하세요. 선턴: ${initiative === 'player' ? '플레이어' : '적'}`
       }
     ],
+    sceneSummary: '고정 11x11 맵에서 플레이어 1명과 보이지 않는 적 1명이 대치 중입니다.',
+    recentEvents: ['모험이 시작되었습니다.'],
+    nextChoices: ['주변을 살핀다', '기척이 나는 방향으로 접근한다', '방어 태세를 갖춘다'],
+    hiddenEnemyHint: {
+      distanceHint: '멀리서 희미한 기척만 감지된다.',
+      threatHint: '위협도는 아직 분명하지 않다.',
+      conditionHint: '상대의 상태는 자세히 보이지 않는다.'
+    },
+    gmTurnCount: 0,
     selectedAction: '대기',
     phase: initiative === 'player' ? 'player-main' : 'enemy-main',
     initiative,

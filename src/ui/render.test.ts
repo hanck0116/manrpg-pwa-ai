@@ -62,7 +62,10 @@ describe('tab UI', () => {
     expect(root.innerHTML).not.toContain('기술 제작</summary>');
     expect(root.innerHTML).not.toContain('스킬 생성');
     expect(root.innerHTML).toContain('보유 마법');
-    expect(root.innerHTML).toContain('적 간단 시트');
+    expect(root.innerHTML).toContain('숨은 적의 기척');
+    expect(root.innerHTML).not.toContain(state.enemy.name);
+    expect(root.innerHTML).not.toContain('적 간단 시트');
+    expect(root.innerHTML).not.toContain(`<dd>${state.enemy.hp} / ${state.enemy.derived.maxHP}</dd>`);
 
     await getClickHandler()({ target: new TestButton({ tab: 'maintenance' }) });
     expect(root.innerHTML).toContain('장비');

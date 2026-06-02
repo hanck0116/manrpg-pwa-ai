@@ -20,7 +20,7 @@ export const callGemini = async (task: LLMTask, payload: LLMPayload, settings: A
       contents: [{ parts: [{ text: buildPrompt(task, payload) }] }],
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 300
+        maxOutputTokens: task === 'gm-turn' ? 500 : 300
       }
     })
   });

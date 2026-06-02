@@ -20,7 +20,10 @@ const defaultPriority: Required<ProviderPriority> = {
   interpret: ['groq', 'openrouter', 'gemini'],
   narrate: ['groq', 'openrouter', 'gemini'],
   summarize: ['gemini', 'openrouter', 'groq'],
-  'generate-skill': ['gemini', 'openrouter', 'groq']
+  'generate-skill': ['gemini', 'openrouter', 'groq'],
+  'gm-turn': ['groq', 'openrouter', 'gemini'],
+  'enemy-action': ['groq', 'openrouter', 'gemini'],
+  'compact-summary': ['gemini', 'openrouter', 'groq']
 };
 
 const providerCalls: Record<ProviderName, (task: LLMTask, payload: LLMPayload, settings: AISettings) => Promise<LLMResponse>> = {
@@ -68,6 +71,11 @@ export const callLLM = async (task: LLMTask, payload: LLMPayload): Promise<LLMRe
           narration: response.narration,
           combat_log: response.combat_log,
           ui_tags: [...response.ui_tags, `provider:${responseProvider}`, 'proxy'],
+          playerActionResult: response.playerActionResult,
+          enemyAction: response.enemyAction,
+          stateDeltas: response.stateDeltas,
+          nextChoices: response.nextChoices,
+          summaryUpdate: response.summaryUpdate,
           meta: {
             ...response.meta,
             provider: responseProvider,
@@ -94,6 +102,11 @@ export const callLLM = async (task: LLMTask, payload: LLMPayload): Promise<LLMRe
         narration: response.narration,
         combat_log: response.combat_log,
         ui_tags: [...response.ui_tags, `provider:${provider}`],
+        playerActionResult: response.playerActionResult,
+        enemyAction: response.enemyAction,
+        stateDeltas: response.stateDeltas,
+        nextChoices: response.nextChoices,
+        summaryUpdate: response.summaryUpdate,
         meta: {
           ...response.meta,
           provider,
