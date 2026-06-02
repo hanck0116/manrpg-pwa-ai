@@ -18,7 +18,12 @@ export const parseLLMText = (text: string): LLMResponse => {
     return {
       narration: typeof parsed.narration === 'string' ? parsed.narration : text,
       combat_log: Array.isArray(parsed.combat_log) ? parsed.combat_log.filter((entry): entry is string => typeof entry === 'string') : [],
-      ui_tags: Array.isArray(parsed.ui_tags) ? parsed.ui_tags.filter((entry): entry is string => typeof entry === 'string') : []
+      ui_tags: Array.isArray(parsed.ui_tags) ? parsed.ui_tags.filter((entry): entry is string => typeof entry === 'string') : [],
+      playerActionResult: parsed.playerActionResult,
+      enemyAction: parsed.enemyAction,
+      stateDeltas: parsed.stateDeltas,
+      nextChoices: parsed.nextChoices,
+      summaryUpdate: parsed.summaryUpdate
     };
   } catch {
     return {

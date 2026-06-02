@@ -214,3 +214,13 @@ npm run build
 10. 사탄 선택 시 힘/민첩/체력 +10이 파생 수치에 반영되고 원본 스탯은 유지되는지 확인한다.
 11. 다음 층 진입 시 증폭/소멸/탄생 층당 1회 사용 기록과 증폭 묘사 대기가 초기화되는지 확인한다.
 12. saveVersion 18 저장/불러오기에서 halo 상태와 statuses가 유지되는지 확인한다.
+
+## saveVersion 19 GM 턴 테스트 범위
+
+- 목표는 GPTs 같은 대화형 TRPG 경험입니다. 테스트는 코드가 상태 기억/수치 연산/저장/검증을 담당하고 API가 GM 진행/플레이어 행동 처리/적 행동 처리/묘사를 담당한다는 분리를 확인합니다.
+- `gm-turn` payload 테스트는 전체 `GameState`, 전체 `log`, 전체 인벤토리, 적 상세 수치/이름이 prompt에 들어가지 않고 compact payload만 들어가는지 확인합니다.
+- UI 테스트는 적이 화면에 상세 표시되지 않고 “기척/위협도/거리감/상태 묘사” 힌트로만 표시되는지 확인합니다. 내부 적은 항상 1명입니다.
+- 상태 적용 테스트는 API 응답의 `stateDeltas`만 player/enemy 상태에 clamp되어 반영되고, `maxHP`, `maxMP`, `level`, 장비 구조 덮어쓰기는 무시되는지 확인합니다.
+- 저장 테스트는 `saveVersion: 19`에서 `sceneSummary`, `recentEvents`, `nextChoices`, `hiddenEnemyHint`가 유지되는지 확인합니다.
+- 회귀 명령: `npm run test`, `npm run worker:check`, `npm run build`.
+- 보스몹 없음, 랜덤맵 없음, 11x11 고정 맵 유지, 원본에 없는 효과 창작 금지를 테스트 기준으로 유지합니다.

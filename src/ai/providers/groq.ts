@@ -20,7 +20,7 @@ export const callGroq = async (task: LLMTask, payload: LLMPayload, settings: AIS
       model: settings.groqModel,
       messages: [{ role: 'user', content: buildPrompt(task, payload) }],
       temperature: 0.7,
-      max_tokens: 300
+      max_tokens: task === 'gm-turn' ? 500 : 300
     })
   });
 

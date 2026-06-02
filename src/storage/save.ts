@@ -20,8 +20,9 @@ import {
   type StatusEffect
 } from '../state/gameState';
 
-export const SAVE_KEY = 'manrpg-pwa-ai:save:v18';
+export const SAVE_KEY = 'manrpg-pwa-ai:save:v19';
 export const LEGACY_SAVE_KEYS = [
+  'manrpg-pwa-ai:save:v18',
   'manrpg-pwa-ai:save:v17',
   'manrpg-pwa-ai:save:v16',
   'manrpg-pwa-ai:save:v15',
@@ -40,7 +41,7 @@ export const LEGACY_SAVE_KEYS = [
   'manrpg-pwa-ai:save:v2',
   'manrpg-pwa-ai:save:v1'
 ];
-export const SAVE_VERSION = 18;
+export const SAVE_VERSION = 19;
 
 type SavePayload = {
   saveVersion: number;
@@ -358,6 +359,12 @@ const isValidHaloState = (value: unknown): value is HaloState => {
 const isValidMagicBookAttempt = (value: unknown): value is GameState['magicBookAttempt'] =>
   isObject(value) && isNumber(value.floor) && typeof value.freeUsed === 'boolean';
 
+const isValidHiddenEnemyHint = (value: unknown): value is GameState['hiddenEnemyHint'] =>
+  isObject(value) &&
+  typeof value.distanceHint === 'string' &&
+  typeof value.threatHint === 'string' &&
+  typeof value.conditionHint === 'string';
+
 const isValidAngelTrial = (value: unknown): value is GameState['angelTrial'] =>
   isObject(value) &&
   Array.isArray(value.claimedScores) &&
@@ -400,10 +407,38 @@ const isValidGameState = (value: unknown): value is GameState => {
     isValidHaloState(value.halo) &&
     isValidMagicBookAttempt(value.magicBookAttempt) &&
     isValidAngelTrial(value.angelTrial) &&
+    typeof value.sceneSummary === 'string' &&
+    Array.isArray(value.recentEvents) &&
+    value.recentEvents.every((entry) => typeof entry === 'string') &&
+    Array.isArray(value.nextChoices) &&
+    value.nextChoices.every((choice) => typeof choice === 'string') &&
+    isValidHiddenEnemyHint(value.hiddenEnemyHint) &&
+    (value.pendingPlayerInput === undefined || typeof value.pendingPlayerInput === 'string') &&
+    (value.lastPlayerInput === undefined || typeof value.lastPlayerInput === 'string') &&
+    isNumber(value.gmTurnCount) &&
     (value.rewardState === undefined || isValidRewardState(value.rewardState)) &&
     (value.pendingReaction === undefined || isValidPendingReaction(value.pendingReaction)) &&
     (value.pendingChoice === undefined || isValidPendingChoice(value.pendingChoice))
   );
+};
+
+
+const withVersion19Defaults = (state: unknown): unknown => {
+  if (!isObject(state)) {
+    return state;
+  }
+
+  const initial = createInitialGameState();
+  return {
+    ...state,
+    sceneSummary: typeof state.sceneSummary === 'string' ? state.sceneSummary : initial.sceneSummary,
+    recentEvents: Array.isArray(state.recentEvents) ? state.recentEvents : initial.recentEvents,
+    nextChoices: Array.isArray(state.nextChoices) ? state.nextChoices : initial.nextChoices,
+    hiddenEnemyHint: isValidHiddenEnemyHint(state.hiddenEnemyHint) ? state.hiddenEnemyHint : initial.hiddenEnemyHint,
+    gmTurnCount: isNumber(state.gmTurnCount) ? state.gmTurnCount : 0,
+    pendingPlayerInput: typeof state.pendingPlayerInput === 'string' ? state.pendingPlayerInput : undefined,
+    lastPlayerInput: typeof state.lastPlayerInput === 'string' ? state.lastPlayerInput : undefined
+  };
 };
 
 const refreshCharacterDerived = (character: Character, equipment?: EquipmentLoadout, effectiveStats?: CoreStats): Character => {
@@ -439,7 +474,7 @@ export const saveGameStub = (state: GameState): string => {
 
   localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
 
-  return `저장: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리, 보유 마법, 스킬, 기술 제작 출처, 기술, 장비, 헤일로, 상태효과, 마법서 시도권, 천사의 시련을 localStorage에 기록했습니다.`;
+  return `저장: saveVersion ${SAVE_VERSION} 상태, 층, 보상, 인벤토리, 보유 마법, 스킬, 기술 제작 출처, 기술, 장비, 헤일로, 상태효과, 마법서 시도권, 천사의 시련, GM 장면 요약을 localStorage에 기록했습니다.`;
 };
 
 export const loadGameStub = (): GameState => {
@@ -452,11 +487,17 @@ export const loadGameStub = (): GameState => {
   try {
     const parsed = JSON.parse(raw) as unknown;
 
-    if (!isObject(parsed) || parsed.saveVersion !== SAVE_VERSION || !isValidGameState(parsed.state)) {
+    if (!isObject(parsed) || (parsed.saveVersion !== SAVE_VERSION && parsed.saveVersion !== 18)) {
       return createInitialGameState();
     }
 
-    return refreshDerivedStats(parsed.state);
+    const candidateState = parsed.saveVersion === 18 ? withVersion19Defaults(parsed.state) : parsed.state;
+
+    if (!isValidGameState(candidateState)) {
+      return createInitialGameState();
+    }
+
+    return refreshDerivedStats(candidateState);
   } catch {
     return createInitialGameState();
   }

@@ -17,11 +17,11 @@ const createLocalStorage = () => {
   };
 };
 
-describe('saveVersion 18', () => {
-  it('stores saveVersion 18', () => {
+describe('saveVersion 19', () => {
+  it('stores saveVersion 19', () => {
     vi.stubGlobal('localStorage', createLocalStorage());
 
-    expect(saveGameStub(createInitialGameState())).toContain('saveVersion 18');
+    expect(saveGameStub(createInitialGameState())).toContain('saveVersion 19');
 
     vi.unstubAllGlobals();
   });

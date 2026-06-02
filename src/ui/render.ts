@@ -32,6 +32,7 @@ import { applyFiveLevelPlus, canFinishLevelAllocation, finishLevelAllocation } f
 import { resolvePlayerReaction, resolvePlayerReactionSkill } from '../game/reactionFlow';
 import { createRewardOffer, claimSelectedRewards, toggleRewardSelection } from '../game/rewardFlow';
 import { advanceTurn, createNewBattleFromPlayer } from '../game/turn';
+import { applyGmTurnResponse, buildGmTurnPayload, getEnemyPublicHint } from '../game/gmTurn';
 import { fixedMap, MAP_SIZE } from '../map/fixedMap';
 import { getMinimapSummary } from '../map/minimap';
 import { getDirectionLabel } from '../game/movement';
@@ -169,7 +170,7 @@ const collectAISettings = (root: HTMLElement): Partial<AISettings> => {
 };
 
 const buildNarrationPayload = (state: GameState, reason = '수동 AI GM 묘사'): Record<string, unknown> => ({
-  summary: state.log.slice(-8).map((entry) => entry.message),
+  summary: state.recentEvents.slice(-5),
   reason,
   phase: state.phase,
   floor: state.floor,
@@ -181,10 +182,9 @@ const buildNarrationPayload = (state: GameState, reason = '수동 AI GM 묘사')
     maxMP: state.player.derived.maxMP,
     position: state.player.position
   },
-  enemy: {
-    hp: state.enemy.hp,
-    maxHP: state.enemy.derived.maxHP,
-    position: state.enemy.position
+  hiddenEnemy: {
+    visibility: 'hidden',
+    ...getEnemyPublicHint(state)
   },
   halo: {
     selectedKind: state.halo.selectedKind,
@@ -981,16 +981,39 @@ const renderActionButtons = (state: GameState): string => {
 };
 
 
-const renderEnemyCompact = (state: GameState): string => `
-  <section class="panel enemy-compact">
-    <h2>적 간단 시트</h2>
+const renderEnemyCompact = (state: GameState): string => {
+  const hint = state.hiddenEnemyHint ?? getEnemyPublicHint(state);
+
+  return `
+    <section class="panel enemy-compact" data-hidden-enemy-panel>
+      <h2>숨은 적의 기척</h2>
+      <p class="muted">적은 내부적으로 1명만 유지되며 상세 수치는 화면에 표시하지 않습니다.</p>
+      <dl>
+        <div><dt>기척</dt><dd>${hint.conditionHint}</dd></div>
+        <div><dt>위협도</dt><dd>${hint.threatHint}</dd></div>
+        <div><dt>거리감</dt><dd>${hint.distanceHint}</dd></div>
+        <div><dt>상태 묘사</dt><dd>${state.enemy.hp > 0 ? '어둠 속에서 움직임이 이어진다.' : '기척이 잦아들었다.'}</dd></div>
+      </dl>
+    </section>
+  `;
+};
+
+const renderTrpgPanel = (state: GameState): string => `
+  <section class="panel trpg-panel">
+    <h2>현재 장면</h2>
+    <p>${state.sceneSummary}</p>
     <dl>
-      <div><dt>이름</dt><dd>${state.enemy.name}</dd></div>
-      <div><dt>HP</dt><dd>${state.enemy.hp} / ${state.enemy.derived.maxHP}</dd></div>
-      <div><dt>위치</dt><dd>${state.enemy.position.x + 1}, ${state.enemy.position.y + 1}</dd></div>
-      <div><dt>공격력</dt><dd>${state.enemy.derived.attack}</dd></div>
-      <div><dt>상태</dt><dd>${state.enemy.guarding ? '방어 중' : '일반'}</dd></div>
+      <div><dt>플레이어</dt><dd>HP ${state.player.hp}/${state.player.derived.maxHP} · MP ${state.player.mp}/${state.player.derived.maxMP} · Lv.${state.player.stats.level} · 공격 ${state.player.derived.attack}</dd></div>
+      <div><dt>위치</dt><dd>${state.player.position.x + 1}, ${state.player.position.y + 1}</dd></div>
+      <div><dt>코인</dt><dd>${state.player.stats.coin}</dd></div>
     </dl>
+    <label class="stacked-label">자연어 행동
+      <textarea data-gm-player-input rows="3" maxlength="300" placeholder="예: 기척을 향해 낮게 자세를 잡고 접근한다">${state.pendingPlayerInput ?? ''}</textarea>
+    </label>
+    <button type="button" class="finish-button" data-gm-send ${state.setupMode || state.levelUpPending ? 'disabled' : ''}>행동 보내기</button>
+    <div class="choice-grid next-choices">
+      ${state.nextChoices.slice(0, 3).map((choice) => `<button type="button" class="choice" data-gm-choice="${choice}">${choice}</button>`).join('')}
+    </div>
   </section>
 `;
 
@@ -1014,6 +1037,7 @@ const renderSavePanel = (): string => `
 const renderBattleTab = (state: GameState): string => `
   <section class="tab-panel battle-layout" data-tab-panel="battle">
     <div>
+      ${renderTrpgPanel(state)}
       ${renderTurnStatus(state)}
       ${renderMap(state)}
       ${renderReactionPanel(state)}
@@ -1153,9 +1177,9 @@ const renderTabBar = (): string => {
 const template = (state: GameState): string => `
   <main class="app-shell">
     <header class="hero">
-      <p class="eyebrow">ManRPG 모바일 전투 시트</p>
+      <p class="eyebrow">ManRPG 모바일 TRPG 시트</p>
       <h1>ManRPG PWA AI</h1>
-      <p>플레이어 1명과 적 1명이 고정 11x11 맵에서 전투하고, 규칙·판정·보상은 로컬에서 처리합니다.</p>
+      <p>GPTs 같은 대화형 TRPG 진행을 목표로 하며, 코드는 상태 기억·수치 연산·저장·검증을 담당하고 API는 GM 진행과 묘사를 담당합니다.</p>
     </header>
 
     ${renderTabBar()}
@@ -1189,6 +1213,7 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
     const addAction = target.dataset.addAction as QueuedAction['type'] | undefined;
     const removeActionId = target.dataset.removeAction;
     const saveAction = target.dataset.save;
+    const gmChoice = target.dataset.gmChoice;
     const statIncrease = target.dataset.statIncrease as AllocatableStatKey | undefined;
     const statDecrease = target.dataset.statDecrease as AllocatableStatKey | undefined;
     const rewardId = target.dataset.toggleReward;
@@ -1223,6 +1248,31 @@ export const bindUI = (root: HTMLElement, getState: () => GameState, setState: (
       return;
     }
 
+
+
+    if (gmChoice) {
+      const input = root.querySelector<HTMLTextAreaElement>('[data-gm-player-input]');
+      if (input) input.value = gmChoice;
+      return;
+    }
+
+    if (target.dataset.gmSend !== undefined) {
+      const playerInput = getInputValue(root, '[data-gm-player-input]');
+      if (!playerInput) {
+        setState(appendLog(getState(), 'GM 턴: 행동을 입력하세요.'));
+        return;
+      }
+
+      const stateBeforeGm = { ...getState(), pendingPlayerInput: playerInput, lastPlayerInput: playerInput };
+      try {
+        const response = await callLLM('gm-turn', buildGmTurnPayload(stateBeforeGm, playerInput));
+        setState(applyGmTurnResponse(stateBeforeGm, response));
+      } catch (error) {
+        logError(error);
+        setState(appendLog(stateBeforeGm, `GM 턴 처리 실패: ${toErrorMessage(error)}`));
+      }
+      return;
+    }
 
     if (selectHalo) {
       await setStateWithAuto(selectHaloKind(getState(), selectHalo), '헤일로 선택 후');

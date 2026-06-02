@@ -20,7 +20,7 @@ export const callOpenRouter = async (task: LLMTask, payload: LLMPayload, setting
       model: settings.openrouterModel,
       messages: [{ role: 'user', content: buildPrompt(task, payload) }],
       temperature: 0.7,
-      max_tokens: 300
+      max_tokens: task === 'gm-turn' ? 500 : 300
     })
   });
 
